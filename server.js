@@ -1,4 +1,5 @@
 const http = require("http");
+const fsSync = require("fs");
 const fs = require("fs/promises");
 const path = require("path");
 
@@ -6,7 +7,7 @@ const PORT = Number(process.env.PORT || 4173);
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const STRUCTURE_DIR = path.join(ROOT, "NodeStructure");
-const LEVEL_AI_DIR = path.resolve(ROOT, "..", "..", "Doc", "Level_AI");
+const LEVEL_AI_DIR = findLevelAiDir(ROOT);
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -15,6 +16,34 @@ const MIME_TYPES = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml; charset=utf-8"
 };
+
+function hasLevelAiFiles(directory) {
+  return ["NPC.csv", "Item.csv", "Building.csv"].every(file => fsSync.existsSync(path.join(directory, file)));
+}
+
+function findLevelAiDir(startDirectory) {
+  const candidates = [];
+
+  if (process.env.LEVEL_AI_DIR) {
+    candidates.push(path.isAbsolute(process.env.LEVEL_AI_DIR)
+      ? process.env.LEVEL_AI_DIR
+      : path.resolve(startDirectory, process.env.LEVEL_AI_DIR));
+  }
+
+  let current = startDirectory;
+  while (true) {
+    candidates.push(path.join(current, "Doc", "Level_AI"));
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  const found = candidates.find(hasLevelAiFiles);
+  if (!found) {
+    throw new Error("Could not find Doc/Level_AI. Set LEVEL_AI_DIR or keep Doc/Level_AI in a parent folder.");
+  }
+  return found;
+}
 
 function sendJson(res, status, data) {
   const body = JSON.stringify(data);
@@ -107,7 +136,7 @@ async function readLevelData() {
   ]);
 
   return {
-    relativePath: "../../Doc/Level_AI",
+    relativePath: path.relative(ROOT, LEVEL_AI_DIR) || ".",
     npcs: parseCsv(npcsText).map(row => ({
       name: row.npc_name,
       type: row.npc_type,
@@ -319,12 +348,11 @@ function storySchema() {
             "startState",
             "plot",
             "nodeOutcome",
-            "contextFacts",
-            "playerOptions",
             "npcs",
             "items",
             "locations",
             "completionCondition",
+            "completionLogic",
             "next"
           ],
           properties: {
@@ -335,12 +363,48 @@ function storySchema() {
             startState: { type: "string" },
             plot: { type: "string" },
             nodeOutcome: { type: "string" },
-            contextFacts: { type: "array", items: { type: "string" } },
-            playerOptions: { type: "array", items: { type: "string" } },
             npcs: { type: "array", items: { type: "string" } },
             items: { type: "array", items: { type: "string" } },
             locations: { type: "array", items: { type: "string" } },
             completionCondition: { type: "string" },
+            completionLogic: {
+              type: "object",
+              additionalProperties: false,
+              required: ["type", "description", "expression", "rules", "effects"],
+              properties: {
+                type: { type: "string" },
+                description: { type: "string" },
+                expression: { type: "string" },
+                rules: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["id", "kind", "target", "operator", "value", "source"],
+                    properties: {
+                      id: { type: "string" },
+                      kind: { type: "string" },
+                      target: { type: "string" },
+                      operator: { type: "string" },
+                      value: { type: "string" },
+                      source: { type: "string" }
+                    }
+                  }
+                },
+                effects: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["trigger", "effect"],
+                    properties: {
+                      trigger: { type: "string" },
+                      effect: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
             next: { type: "array", items: { type: "string" } }
           }
         }
@@ -484,10 +548,10 @@ async function handleGenerateStory(req, res) {
           "The plot can be rich without becoming complicated. Include NPC dialogue, NPC movement, small conflicts, reactions, and visible use of items or locations, but keep cause and effect easy to follow.",
           "The player must be present as an active possible driver of the scene. Include what the player can agree with, question, help with, refuse, give, reveal, protect, or persuade.",
           "Do not erase the player from expandedStory or node plots. Use optional wording such as 玩家可以..., 若玩家..., 玩家能通过..., 可由玩家选择..., instead of writing that the player already did the action.",
-          "Each node must include playerOptions: 2 to 4 concrete player interventions that can move the node forward. These should match completionCondition and outgoing edges when possible.",
-          "Each node must include contextFacts: 2 to 4 facts the player can learn in this node. These facts should explain prior cause, relationship, betrayal, debt, promise, evidence, or motive relevant to the conflict.",
-          "Expose contextFacts through NPC speech, visible actions, or inspectable items. Avoid dumping lore in narration when an NPC can say it clearly.",
-          "When a conflict depends on backstory, make an NPC state the cause in plain language. Examples: '他三天前收了我的钱却卖了我', '这瓶酒不是吧台的，是他从袖子里拿出来的', '我不敢作证，因为上次作证的人失踪了'.",
+          "Do not output separate playerOptions or contextFacts fields. Player-facing actions belong in completionCondition, completionLogic, edge labels, and transitions.",
+          "Facts the player needs to understand must be delivered inside the story text, especially through NPC dialogue. When a conflict depends on backstory, make an NPC state the cause in plain language.",
+          "Examples of useful explanatory dialogue: '他三天前收了我的钱却卖了我', '这瓶酒不是吧台的，是他从袖子里拿出来的', '我不敢作证，因为上次作证的人失踪了'.",
+          "Every important dialogue line should include or be surrounded by enough context to explain who is being accused, what happened before, and why the line matters.",
           "expandedStory must be a coherent story treatment that can later be split into nodes. Do not write meta commentary such as 这是一个从...抽取主题后的故事, 故事通过...结构展开, or 枢纽结构.",
           "expandedStory should read like one complete story foundation, not like an explicit branch list. Do not use labels such as 分支A, 分支B, HUB, N1, N2, or 条件路线 in expandedStory.",
           "While writing expandedStory, silently consider the selected structure and leave clear story moments that can become branches later: different NPC motives, competing solutions, important decisions, reversals, and convergence points.",
@@ -499,12 +563,18 @@ async function handleGenerateStory(req, res) {
           "Do not flatten the story into a simple linear quest. Include enough tension and decision points for later branching, but keep the presentation as a smooth story treatment.",
           "Do not narrate optional player behavior as already completed in expandedStory, plot, startState, or nodeOutcome. Avoid sentences like 玩家已经..., 玩家先做了..., 玩家发现了... unless the player action is written as an option, condition, or available intervention.",
           "NPCs may act without the player: for example Raven says a warning, Torin blocks the door, Alice walks to the fire, Borin hides coins, or Darius sends a threat.",
-          "Player agency belongs in completionCondition, edge label, and transition. Use wording like 若玩家说服..., 如果获得..., 选择...后可进入..., rather than assuming the action happened.",
+          "Player agency belongs in completionCondition, completionLogic, edge label, and transition. Use wording like 若玩家说服..., 如果获得..., 选择...后可进入..., rather than assuming the action happened.",
           "Make transitions clear: every edge label is a short playable trigger, and every edge transition explains the state change that unlocks the next node without forcing a single player route.",
-          "Each node must include layer, nodePurpose, startState, plot, nodeOutcome, contextFacts, playerOptions, NPCs, items, locations, and a concrete completion condition.",
-          "Completion conditions should be playable gates such as recruiting an NPC, persuading an NPC about a precise topic, obtaining an item, spending money, solving a location problem, discovering evidence, trading a favor, or choosing a moral cost.",
+          "Each node must include layer, nodePurpose, startState, plot, nodeOutcome, NPCs, items, locations, completionCondition, completionLogic, and next.",
+          "Node completion is usually a condition gate. Use completionLogic.type='condition_gate' for these gates.",
+          "Completion conditions can use affinity, companion status, money, item ownership from the provided item list, evidence, location state, or story flags.",
+          "Use AND/OR/NOT explicitly in completionLogic.expression. Examples: (affinity:Alice >= 6 AND item:黑玻苦啤) OR companion:Torin; item:壁卫盾 AND money >= 100; companion:Raven OR companion:Alice; NOT flag:DariusEscaped.",
+          "completionLogic.rules should list each atomic condition. Use kind values like affinity, companion, money, item, evidence, location_state, story_flag. Use operator values like >=, <=, =, has, not_has, true, false.",
+          "completionLogic.effects should list consequences that happen when a condition is satisfied, especially relationship changes or mutually exclusive results.",
+          "Support mutual exclusion when appropriate. Example: if the player becomes friend/companion with Alice, and Alice and Darius are enemies, add an effect such as trigger='companion:Alice' and effect='Darius affinity becomes 0 and Darius treats player as enemy'.",
+          "completionCondition is the readable Chinese summary of completionLogic. It should be understandable to a designer without reading the rules.",
           "startState means the world and NPC situation when this node becomes available. It is not a dramatic hook and must not prescribe player behavior. For non-start nodes, it must clearly connect to at least one incoming edge transition.",
-          "plot means the node's objective situation, NPC actions, background facts, and possible player interventions. It should be 5 to 8 plain sentences. Include at least two concrete NPC actions, one short direct speech line that explains cause or motive when NPCs are present, one player-facing action option, and one visible use or mention of a relevant item/location.",
+          "plot means the node's objective situation, NPC actions, background facts, and possible player interventions. It should be 5 to 8 plain sentences. Include at least two concrete NPC actions, one short direct speech line that explains cause or motive when NPCs are present, and one visible use or mention of a relevant item/location.",
           "Each node plot should feel like a complete small scene: beginning situation, NPC conflict or pressure, important action, choice pressure, and the state that points toward the completion condition.",
           "nodeOutcome means what has changed when the node condition is satisfied, written as a state change rather than a guaranteed player action. It should be 2 to 3 plain sentences and must prepare the next node's startState.",
           "Dialogue must be clear. When an NPC says something important, the line or the nearby sentence must explain what they are referring to, what happened before, and why it matters. Avoid cryptic lines that only sound dramatic.",

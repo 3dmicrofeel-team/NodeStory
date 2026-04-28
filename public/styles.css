@@ -472,8 +472,7 @@ textarea:focus {
   margin-bottom: 4px;
 }
 
-.context-facts,
-.player-options {
+.completion-logic {
   border-left: 4px solid var(--accent);
   background: #f4faf7;
   border-radius: 7px;
@@ -481,22 +480,50 @@ textarea:focus {
   margin: 10px 0;
 }
 
-.context-facts {
-  border-left-color: var(--gold);
-  background: #fff8e7;
-}
-
-.context-facts strong,
-.player-options strong {
+.completion-logic strong {
   display: block;
   color: var(--accent-dark);
   font-size: 12px;
   margin-bottom: 6px;
 }
 
-.context-facts p,
-.player-options p {
+.completion-logic p {
   margin: 6px 0 0;
+}
+
+.logic-expression {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.logic-list,
+.logic-effects {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.logic-list p,
+.logic-effects p {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px;
+}
+
+.logic-list span,
+.logic-effects span {
+  color: var(--accent-dark);
+  display: inline-block;
+  font-weight: 900;
+  margin-right: 8px;
+}
+
+.logic-list em {
+  color: var(--muted);
+  display: block;
+  font-style: normal;
+  margin-top: 4px;
 }
 
 .tags {

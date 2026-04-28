@@ -217,17 +217,10 @@ function renderNodeDetail(nodeId) {
       <h3>${escapeHtml(node.id)} · ${escapeHtml(node.title)}</h3>
       <div class="beat"><strong>节点开始状态</strong><p>${escapeHtml(node.startState)}</p></div>
       <p>${escapeHtml(node.plot)}</p>
-      <div class="context-facts">
-        <strong>玩家需要知道的前因后果</strong>
-        ${(node.contextFacts || []).map(fact => `<p>${escapeHtml(fact)}</p>`).join("")}
-      </div>
-      <div class="player-options">
-        <strong>玩家可推动方式</strong>
-        ${(node.playerOptions || []).map(option => `<p>${escapeHtml(option)}</p>`).join("")}
-      </div>
       <div class="beat"><strong>节点结果</strong><p>${escapeHtml(node.nodeOutcome)}</p></div>
       <div class="tags">${tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
       <div class="condition"><strong>开启下一节点条件：</strong>${escapeHtml(node.completionCondition)}</div>
+      ${renderCompletionLogic(node.completionLogic)}
       <div class="transitions">
         <strong>后续衔接</strong>
         ${transitions.length ? transitions.map(edge => `
@@ -240,6 +233,31 @@ function renderNodeDetail(nodeId) {
   elements.graph.querySelectorAll(".graph-node").forEach(item => {
     item.classList.toggle("selected", item.dataset.nodeId === nodeId);
   });
+}
+
+function renderCompletionLogic(logic) {
+  if (!logic) return "";
+  const rules = logic.rules || [];
+  const effects = logic.effects || [];
+
+  return `
+    <div class="completion-logic">
+      <strong>完成条件逻辑</strong>
+      <p class="logic-expression">${escapeHtml(logic.expression || logic.description || "-")}</p>
+      ${rules.length ? `
+        <div class="logic-list">
+          ${rules.map(rule => `
+            <p><span>${escapeHtml(rule.id)}</span>${escapeHtml(rule.kind)} · ${escapeHtml(rule.target)} ${escapeHtml(rule.operator)} ${escapeHtml(rule.value)} <em>${escapeHtml(rule.source)}</em></p>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${effects.length ? `
+        <div class="logic-effects">
+          ${effects.map(effect => `<p><span>${escapeHtml(effect.trigger)}</span>${escapeHtml(effect.effect)}</p>`).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
 }
 
 function renderGraph(story) {

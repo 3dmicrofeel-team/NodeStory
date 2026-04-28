@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NodeStory</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="control-panel">
+        <div class="brand">
+          <span class="mark">NS</span>
+          <div>
+            <h1>节点化叙事生成器</h1>
+            <p>读取 NodeStructure 与 Level_AI 素材，生成可视化分支故事。</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>OpenAI API Key</span>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
+        </label>
+
+        <label class="remember-row">
+          <input id="rememberKey" type="checkbox" checked />
+          <span>记住 Key</span>
+        </label>
+
+        <div class="key-row">
+          <button id="validateBtn" class="secondary" type="button">验证 Key</button>
+          <span id="keyStatus" class="status">未验证</span>
+        </div>
+
+        <label class="field">
+          <span>自然语言故事</span>
+          <textarea id="storyInput" rows="11" placeholder="例如：三个志同道合的人在酒馆相遇，在危机中结成誓约，并踏上共同冒险。"></textarea>
+        </label>
+
+        <button id="generateBtn" class="primary" type="button" disabled>生成节点故事</button>
+
+        <div class="context-strip">
+          <div>
+            <strong id="npcCount">-</strong>
+            <span>NPC</span>
+          </div>
+          <div>
+            <strong id="itemCount">-</strong>
+            <span>道具</span>
+          </div>
+          <div>
+            <strong id="buildingCount">-</strong>
+            <span>地点</span>
+          </div>
+        </div>
+
+        <section class="structure-list">
+          <h2>结构库</h2>
+          <div id="structures"></div>
+        </section>
+      </section>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <div>
+            <h2 id="resultTitle">等待生成</h2>
+            <p id="resultMeta">验证 Key 后输入故事。</p>
+          </div>
+          <button id="exportBtn" class="secondary" type="button" disabled>导出 JSON</button>
+        </div>
+
+        <div id="notice" class="notice">生成后先显示节点结构图，点击任意节点查看该节点的剧情、NPC、道具、地点、完成条件和后续衔接。</div>
+
+        <section id="storySummary" class="summary hidden"></section>
+        <section id="graph" class="graph"></section>
+        <section id="nodeList" class="node-list"></section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,36 @@
+N1:
+- content:
+- choices:
+  → N2A
+  → N2B
+
+N2A:
+- content:
+- next: N3B   （交叉）
+
+N2B:
+- content:
+- next: N3A   （交叉）
+
+N3A:
+- content:
+- next: N4A
+
+N3B:
+- content:
+- next: N4B
+
+N4A:
+- content:
+- next: N5
+
+N4B:
+- content:
+- next: N5
+
+N5:
+- content:
+- next: N6
+
+N6:
+- content:

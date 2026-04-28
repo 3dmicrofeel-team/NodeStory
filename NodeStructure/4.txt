@@ -1,0 +1,38 @@
+N1:
+- content:
+- choices:
+  → N2A
+  → N2B
+
+N2A:
+- content:
+- next: N3
+
+N2B:
+- content:
+- next: N3
+
+N3（关键节点）:
+- condition:
+  IF 条件1 → N4A
+  IF 条件2 → N4B
+  ELSE → N4C
+
+N4A:
+- content:
+- next: N5
+
+N4B:
+- content:
+- next: N5
+
+N4C:
+- content:
+- next: N5
+
+N5:
+- content:
+- next: N6
+
+N6:
+- content:

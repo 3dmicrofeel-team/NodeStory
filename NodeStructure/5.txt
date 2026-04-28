@@ -1,0 +1,50 @@
+N1:
+- content:
+- choices:
+  → N2A
+  → N2B
+
+N2A:
+- content:
+- next: N3A / N3B
+
+N2B:
+- content:
+- next: N3B / N3C
+
+N3A:
+- content:
+- next: N4A
+
+N3B:
+- content:
+- next: N4A / N4B
+
+N3C:
+- content:
+- next: N4B
+
+N4A:
+- content:
+- next: N5A
+
+N4B:
+- content:
+- next: N5B
+
+N5A:
+- content:
+- next: E1 / E2
+
+N5B:
+- content:
+- next: E2 / E3
+
+E1:
+- ending:
+
+E2:
+- ending:
+
+E3:
+- ending:

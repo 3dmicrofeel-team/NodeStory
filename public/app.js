@@ -103,6 +103,7 @@ function setBusy(isBusy, message) {
 function renderSummary(payload) {
   const story = payload.story;
   const selectionScores = payload.selection?.scores || [];
+  const generationStages = payload.generationStages || [];
   const adaptation = story.adaptation || {};
   const storyContext = story.storyContext || {};
   const deck = story.designDeck || {};
@@ -117,9 +118,15 @@ function renderSummary(payload) {
   ];
 
   elements.resultTitle.textContent = story.selectedStructure.name || `结构 ${story.selectedStructure.id}`;
-  elements.resultMeta.textContent = `由 gpt-4o 选择 ${story.selectedStructure.file}，素材来自 ${payload.levelDataSummary.relativePath}`;
+  elements.resultMeta.textContent = `分阶段生成 · ${story.selectedStructure.file} · 素材来自 ${payload.levelDataSummary.relativePath}`;
   elements.storySummary.classList.remove("hidden");
   elements.storySummary.innerHTML = `
+    <div class="summary-block">
+      <h3>生成阶段</h3>
+      <div class="stage-list">
+        ${generationStages.map(stage => `<span>${escapeHtml(stage.label)}：${escapeHtml(stage.model)}</span>`).join("")}
+      </div>
+    </div>
     <div class="summary-block">
       <h3>改编原则</h3>
       <dl class="deck-list">
@@ -216,7 +223,8 @@ function renderNodeDetail(nodeId) {
       <div class="node-meta">第 ${escapeHtml(node.layer)} 层 · ${escapeHtml(node.nodePurpose)}</div>
       <h3>${escapeHtml(node.id)} · ${escapeHtml(node.title)}</h3>
       <div class="beat"><strong>节点开始状态</strong><p>${escapeHtml(node.startState)}</p></div>
-      <p>${escapeHtml(node.plot)}</p>
+      <div class="plot-text">${escapeHtml(node.plot)}</div>
+      ${renderSceneBeats(node)}
       <div class="beat"><strong>节点结果</strong><p>${escapeHtml(node.nodeOutcome)}</p></div>
       <div class="tags">${tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
       <div class="condition"><strong>开启下一节点条件：</strong>${escapeHtml(node.completionCondition)}</div>
@@ -235,34 +243,202 @@ function renderNodeDetail(nodeId) {
   });
 }
 
+function renderSceneBeats(node) {
+  const dialogue = Array.isArray(node.keyDialogue) ? node.keyDialogue : [];
+  const actions = Array.isArray(node.keyActions) ? node.keyActions : [];
+  if (!dialogue.length && !actions.length) return "";
+
+  const dialogueMarkup = dialogue.length ? `
+    <section class="key-dialogue">
+      <strong>NPC 对白</strong>
+      <ul>
+        ${dialogue.map(item => `
+          <li>
+            <span class="speaker">${escapeHtml(item.speaker || "NPC")}</span>
+            <span class="line">"${escapeHtml(item.line || "")}"</span>
+            ${item.intent ? `<span class="intent">${escapeHtml(item.intent)}</span>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    </section>
+  ` : "";
+
+  const actionMarkup = actions.length ? `
+    <section class="key-actions">
+      <strong>NPC 动作</strong>
+      <ul>
+        ${actions.map(item => `
+          <li>
+            <span class="actor">${escapeHtml(item.actor || "NPC")}</span>
+            <span class="action">${escapeHtml(item.action || "")}</span>
+            ${item.intent ? `<span class="intent">${escapeHtml(item.intent)}</span>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    </section>
+  ` : "";
+
+  return `<div class="scene-beats">${dialogueMarkup}${actionMarkup}</div>`;
+}
+
 function renderCarriedResults(results) {
   if (!results || !results.length) return "";
   return `<em class="carried-results">继承结果：${results.map(escapeHtml).join("；")}</em>`;
+}
+
+const OBJECTIVE_KIND_LABELS = {
+  affinity_min: "好感 ≥",
+  affinity_max: "好感 ≤",
+  friend: "说服为朋友",
+  companion: "说服为伙伴",
+  enemy: "成为敌人",
+  not_enemy: "避免敌对",
+  defeated: "击败",
+  item_obtained: "获得道具",
+  item_lost: "失去道具",
+  item_delivered: "交付道具",
+  money_at_least: "筹集金钱",
+  money_spent: "花费金钱",
+  fame_min: "名誉 ≥",
+  fame_max: "名誉 ≤",
+  story_flag: "剧情标记"
+};
+
+const RESULT_KIND_LABELS = {
+  affinity: "好感",
+  friend: "朋友",
+  enemy: "敌人",
+  companion: "伙伴",
+  defeated: "击败",
+  money: "金钱",
+  item: "道具",
+  fame: "名誉",
+  route: "路线",
+  story_flag: "剧情标记"
+};
+
+const RESULT_KIND_GROUP = {
+  affinity: "relation",
+  friend: "relation",
+  enemy: "negative",
+  companion: "relation",
+  defeated: "negative",
+  money: "money",
+  item: "item",
+  fame: "fame",
+  route: "route",
+  story_flag: "flag"
+};
+
+function objectiveKindLabel(kind) {
+  return OBJECTIVE_KIND_LABELS[kind] || kind || "目标";
+}
+
+function resultKindLabel(kind) {
+  return RESULT_KIND_LABELS[kind] || kind || "结果";
+}
+
+function objectiveKindClass(kind) {
+  if (!kind) return "kind-default";
+  if (kind.startsWith("affinity")) return "kind-affinity";
+  if (kind.startsWith("money")) return "kind-money";
+  if (kind.startsWith("fame")) return "kind-fame";
+  if (kind.startsWith("item")) return "kind-item";
+  if (kind === "friend") return "kind-friend";
+  if (kind === "companion") return "kind-companion";
+  if (kind === "enemy") return "kind-enemy";
+  if (kind === "not_enemy") return "kind-not-enemy";
+  if (kind === "defeated") return "kind-defeated";
+  return "kind-default";
+}
+
+function resultKindClass(kind) {
+  return `kind-${RESULT_KIND_GROUP[kind] || "default"} kind-${kind || "default"}`;
+}
+
+function deltaTone(delta, kind) {
+  const value = String(delta || "").trim();
+  if (!value) {
+    if (kind === "enemy") return "negative";
+    if (kind === "friend" || kind === "companion") return "positive";
+    return "neutral";
+  }
+  if (/^\+/.test(value) || ["获得", "开启", "成立", "提升", "上升"].some(token => value.includes(token))) return "positive";
+  if (/^-/.test(value) || ["失去", "关闭", "解除", "下降", "降低"].some(token => value.includes(token))) return "negative";
+  return "neutral";
+}
+
+function renderObjective(objective) {
+  const kind = objective.kind || "";
+  const summary = objective.text || `${objective.target || ""} ${objective.operator || ""} ${objective.value || ""}`.trim();
+  const detailParts = [];
+  if (objective.target) detailParts.push(escapeHtml(objective.target));
+  if (objective.operator) detailParts.push(escapeHtml(objective.operator));
+  if (objective.value !== undefined && objective.value !== "") detailParts.push(escapeHtml(objective.value));
+
+  return `
+    <li class="objective-item ${objectiveKindClass(kind)}">
+      <span class="kind-badge">${escapeHtml(objectiveKindLabel(kind))}</span>
+      <div class="objective-body">
+        <p class="objective-text">${escapeHtml(summary || "-")}</p>
+        ${detailParts.length ? `<p class="objective-detail">${detailParts.join(" ")}</p>` : ""}
+      </div>
+    </li>
+  `;
+}
+
+function renderResult(result) {
+  const kind = result.kind || "";
+  const tone = deltaTone(result.delta || result.change, kind);
+  const delta = result.delta || result.change || "";
+  return `
+    <li class="result-item ${resultKindClass(kind)} tone-${tone}">
+      <span class="kind-badge">${escapeHtml(resultKindLabel(kind))}</span>
+      ${result.target ? `<span class="result-target">${escapeHtml(result.target)}</span>` : ""}
+      ${delta ? `<span class="result-delta">${escapeHtml(delta)}</span>` : ""}
+      <p class="result-text">${escapeHtml(result.text || result.change || "-")}</p>
+    </li>
+  `;
 }
 
 function renderCompletionLogic(logic) {
   if (!logic) return "";
   const objectives = logic.objectives || logic.rules || [];
   const results = logic.results || logic.effects || [];
+  const resultBranches = logic.resultBranches || [];
 
   return `
     <div class="completion-logic">
       <strong>任务目标</strong>
       <p class="logic-expression">${escapeHtml(logic.summary || logic.description || logic.expression || "-")}</p>
       ${objectives.length ? `
-        <div class="logic-list">
-          ${objectives.map(objective => `
-            <p><span>${escapeHtml(objective.id || objective.kind)}</span>${escapeHtml(objective.text || `${objective.target} ${objective.operator} ${objective.value}`)}</p>
+        <ul class="objective-list">
+          ${objectives.map(renderObjective).join("")}
+        </ul>
+      ` : ""}
+      ${results.length ? `
+        <div class="result-block">
+          <strong>通用完成结果</strong>
+          <ul class="result-list">
+            ${results.map(renderResult).join("")}
+          </ul>
+        </div>
+      ` : ""}
+      ${resultBranches.length ? `
+        <div class="result-branches">
+          <strong>分支完成结果</strong>
+          ${resultBranches.map(branch => `
+            <article class="result-branch">
+              <h4>${escapeHtml(branch.branchId || "分支")} · ${escapeHtml(branch.appliesWhen || "")}</h4>
+              ${(branch.to || []).length ? `<p class="branch-target">进入：${(branch.to || []).map(escapeHtml).join(" / ")}</p>` : ""}
+              <ul class="result-list">
+                ${(branch.results || []).map(renderResult).join("")}
+              </ul>
+            </article>
           `).join("")}
         </div>
       ` : ""}
-      ${results.length ? `
-        <div class="logic-effects">
-          <strong>完成结果</strong>
-          ${results.map(result => `<p><span>${escapeHtml(result.kind || result.trigger)}</span>${escapeHtml(result.text || result.effect || result.change)}</p>`).join("")}
-        </div>
-      ` : ""}
-      <p class="logic-formula">${escapeHtml(logic.expression || "")}</p>
+      ${logic.expression ? `<p class="logic-formula">${escapeHtml(logic.expression)}</p>` : ""}
     </div>
   `;
 }
@@ -445,7 +621,7 @@ elements.rememberKey.addEventListener("change", () => {
 });
 
 elements.generateBtn.addEventListener("click", async () => {
-  setBusy(true, "正在发叙事牌、选择结构并生成节点故事...");
+  setBusy(true, "正在分阶段生成：结构选择、故事底稿、节点蓝图、节点细写...");
   const apiKey = elements.apiKey.value.trim();
   elements.apiKey.value = apiKey;
   syncSavedApiKey(apiKey);

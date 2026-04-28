@@ -347,6 +347,8 @@ function storySchema() {
             "nodePurpose",
             "startState",
             "plot",
+            "keyDialogue",
+            "keyActions",
             "nodeOutcome",
             "npcs",
             "items",
@@ -362,6 +364,32 @@ function storySchema() {
             nodePurpose: { type: "string" },
             startState: { type: "string" },
             plot: { type: "string" },
+            keyDialogue: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["speaker", "line", "intent"],
+                properties: {
+                  speaker: { type: "string" },
+                  line: { type: "string" },
+                  intent: { type: "string" }
+                }
+              }
+            },
+            keyActions: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["actor", "action", "intent"],
+                properties: {
+                  actor: { type: "string" },
+                  action: { type: "string" },
+                  intent: { type: "string" }
+                }
+              }
+            },
             nodeOutcome: { type: "string" },
             npcs: { type: "array", items: { type: "string" } },
             items: { type: "array", items: { type: "string" } },
@@ -370,7 +398,7 @@ function storySchema() {
             completionLogic: {
               type: "object",
               additionalProperties: false,
-              required: ["type", "summary", "expression", "objectives", "results"],
+              required: ["type", "summary", "expression", "objectives", "results", "resultBranches"],
               properties: {
                 type: { type: "string" },
                 summary: { type: "string" },
@@ -396,12 +424,41 @@ function storySchema() {
                   items: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["kind", "target", "change", "text"],
+                    required: ["kind", "target", "change", "delta", "text"],
                     properties: {
                       kind: { type: "string" },
                       target: { type: "string" },
                       change: { type: "string" },
+                      delta: { type: "string" },
                       text: { type: "string" }
+                    }
+                  }
+                },
+                resultBranches: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["branchId", "appliesWhen", "to", "results"],
+                    properties: {
+                      branchId: { type: "string" },
+                      appliesWhen: { type: "string" },
+                      to: { type: "array", items: { type: "string" } },
+                      results: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          required: ["kind", "target", "change", "delta", "text"],
+                          properties: {
+                            kind: { type: "string" },
+                            target: { type: "string" },
+                            change: { type: "string" },
+                            delta: { type: "string" },
+                            text: { type: "string" }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -428,6 +485,196 @@ function storySchema() {
       }
     }
   };
+}
+
+function storyFoundationSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["adaptation", "storyContext", "designDeck", "expandedStory", "layerNotes"],
+    properties: {
+      adaptation: storySchema().properties.adaptation,
+      storyContext: storySchema().properties.storyContext,
+      designDeck: storySchema().properties.designDeck,
+      expandedStory: { type: "string" },
+      layerNotes: storySchema().properties.layerNotes
+    }
+  };
+}
+
+function nodeBlueprintSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["nodes", "edges"],
+    properties: {
+      nodes: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "layer", "title", "nodePurpose", "storyMoment", "stateFocus", "conditionIdea", "next"],
+          properties: {
+            id: { type: "string" },
+            layer: { type: "integer" },
+            title: { type: "string" },
+            nodePurpose: { type: "string" },
+            storyMoment: { type: "string" },
+            stateFocus: { type: "string" },
+            conditionIdea: { type: "string" },
+            next: { type: "array", items: { type: "string" } }
+          }
+        }
+      },
+      edges: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["from", "to", "label", "expectedCarriedResults"],
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            label: { type: "string" },
+            expectedCarriedResults: { type: "array", items: { type: "string" } }
+          }
+        }
+      }
+    }
+  };
+}
+
+function narrativeSystemPrompt() {
+  return [
+    "You are a senior game narrative designer for a node-based RPG story system.",
+    "Write in Simplified Chinese.",
+    "Use only NPCs, items, and locations from the provided Level_AI data.",
+    "",
+    "## Story adaptation",
+    "If the user gives a famous story, myth, historical scene, or literary plot, do not mechanically reskin its surface. First extract its durable dramatic theme, then adapt that theme into a new story using the available NPCs, items, and locations.",
+    "For example, 桃园结义 should become a story about three like-minded people choosing sworn fellowship and a shared adventure under pressure. It should not require Liu Bei, Guan Yu, Zhang Fei, a literal peach garden, or the exact original events.",
+    "The adaptation must preserve the emotional engine: why these people need each other, what risk makes the vow meaningful, what future adventure the vow opens, and what playable actions prove the bond.",
+    "",
+    "## Story foundation",
+    "Before writing nodes, define storyContext: playerRole, mainConflict, priorIncident, and stakes. These are the facts the player must understand to role-play well.",
+    "Use a Fabula-like and tabletop DND-like card deal before writing: premise card, conflict card, location card, NPC face cards, item clue/cost cards, twist card, cost card, and resolution card. Put the final deal into designDeck.",
+    "Keep the story straightforward. Use one main conflict, one main opposition force, and one clear goal. Branches should be different ways to solve the same main problem, not new subplots.",
+    "Avoid unnecessary twists, fake clues, hidden debts, extra witnesses, or bait plans when a simpler cause-and-effect path works.",
+    "",
+    "## Cast and structure discipline",
+    "Treat the selected structure as layers. Nodes in the same layer are peer narrative options, not main/sub branches. They must have comparable length, stakes, usefulness, and dramatic weight.",
+    "Do not let same-layer nodes repeat the same scene with renamed NPCs. Each peer node should express a different method, risk, moral angle, or information route.",
+    "Limit the core cast to 3 to 5 important NPCs across the story unless the selected structure truly requires more. Other NPCs may be omitted.",
+    "Limit the core props to 3 to 5 important items across the story. Do not mention many items just because they exist in Level_AI data.",
+    "Each node should usually contain no more than 3 named NPCs and 2 important items. If more appear, they must have a direct role in that node.",
+    "Avoid nested choices inside a branch. A branch may have steps, but it should not split into another mini-branch unless the selected structure explicitly requires it.",
+    "Avoid stacking several condition words in one paragraph, such as 若选择..., 若选择..., 若已有..., 若已有.... Put choices into separate labeled branch sections.",
+    "Respect the selected node structure exactly.",
+    "",
+    "## NPC-driven scene writing — this is the most important rule",
+    "The player understands the story almost entirely through what NPCs say and do, plus visible items and locations. Background facts must enter the scene through NPC behavior, not through narrator exposition.",
+    "Each node is a small playable scene. Write it like an RPG cutscene: who is here, who walks where, what is on the table, who speaks first, what they say, how others react.",
+    "Use plain words, short sentences, and concrete actions: who walks toward whom, who picks up an object, who blocks a door, who looks away, who slams coins down.",
+    "Do not write ornate prose. Do not summarize emotion in narrator voice. Show emotion through action and dialogue.",
+    "Do not erase the player. Use optional wording such as 玩家可以..., 若玩家..., 玩家能通过..., 可由玩家选择..., instead of stating the action already happened.",
+    "Do not narrate optional player behavior as already completed in expandedStory, plot, startState, or nodeOutcome. Avoid sentences like 玩家已经..., 玩家先做了..., 玩家发现了... unless framed as an option or condition.",
+    "Do not output separate playerOptions or contextFacts fields. Player-facing actions belong in completionCondition, completionLogic, edge labels, and transitions.",
+    "",
+    "## Required structured fields per node: keyDialogue and keyActions",
+    "Every node with at least one NPC must produce a generous, scene-length record of NPC speech and behavior, not a sparse summary.",
+    "keyDialogue: at least 5 entries, ideally 6 to 8, up to 10 if the scene has many NPCs or back-and-forth pressure. Treat dialogue as turns of conversation: question and answer, accusation and reply, plea and refusal, threat and counter, etc. The same NPC can speak multiple times, and different NPCs should react to each other.",
+    "keyActions: at least 4 entries, ideally 5 to 7, up to 9 if more NPCs are present. Spread the actions across the scene — entering, reacting, escalating, retreating — not all bunched at one moment.",
+    "keyDialogue items: { speaker: NPC name from Level_AI; line: a short direct quote in Chinese, ideally under 30 characters; intent: one sentence explaining what fact, motive, or pressure this line delivers to the player }.",
+    "keyActions items: { actor: NPC name from Level_AI; action: a concrete physical action in Chinese, e.g. 把铜币塞进袖筒、走向火炉、拦在门口、把酒瓶推到玩家面前; intent: one sentence explaining what this action signals or sets up }.",
+    "keyActions must describe NPC behavior only. Do not put player actions there. Player choices belong in completionLogic.objectives.",
+    "Together, keyDialogue and keyActions must cover: (1) the cause of the conflict and any prior incident, (2) who blocks the goal and why, (3) the visible stakes and pressure on the player, (4) at least two distinct hooks the player can act on, (5) the emotional reaction of NPCs to the unfolding situation.",
+    "Order keyDialogue and keyActions roughly in the chronological order they occur in the scene, so the reader can follow the beat-by-beat flow.",
+    "Examples of useful explanatory dialogue: '他三天前收了我的钱却卖了我', '这瓶酒不是吧台的，是他从袖子里拿出来的', '我不敢作证，因为上次作证的人失踪了'.",
+    "Every important dialogue line should be paired with surrounding context — either the dialogue's intent field, an adjacent keyAction, or the plot prose — so the player understands what the line refers to and why it matters.",
+    "Plot prose must remain consistent with keyDialogue and keyActions. Do not introduce contradictory dialogue or actions in plot that are not represented in those structured fields.",
+    "",
+    "## plot, startState, and nodeOutcome",
+    "startState means the world and NPC situation when this node becomes available. It is not a dramatic hook and must not prescribe player behavior. For non-start nodes, it must clearly connect to at least one incoming edge transition.",
+    "plot is a 6 to 10 sentence scene narration that ties together the keyDialogue and keyActions. It should describe where the scene is, who is doing what, and how the situation moves toward the completion objectives. It must mention or use at least one relevant item or location and reference the NPC behavior captured in keyActions.",
+    "Each node plot should feel like a complete small scene: opening situation, NPC conflict or pressure, important visible action, choice pressure on the player, and the state that points toward the completion condition.",
+    "nodeOutcome means what has changed when the node condition is satisfied, written as a state change rather than a guaranteed player action. 2 to 3 plain sentences. It must prepare the next node's startState.",
+    "Maintain continuity across nodes. If an NPC, item, threat, promise, or clue appears in one node and matters later, carry it forward explicitly instead of resetting the scene.",
+    "",
+    "## Player advancement through tasks, not narration",
+    "The player advances the story by making choices and completing tasks: 筹集金钱、获得道具、把道具交给某 NPC、说服某 NPC（让其成为朋友/伙伴或同意做某事）、击败某 NPC、与某 NPC 成为朋友/伙伴、提升好感度、提升名誉、避免成为某人敌人、为某 NPC 出面作证 等。",
+    "Each node's completionCondition must read like an obvious quest objective, not like dramatic narration. Players must know what they need to do to leave the node.",
+    "completionLogic.summary should be one short sentence summarizing the player's current task in the scene, e.g. 帮 Alice 筹齐 100 金币并说服 Borin 成为伙伴.",
+    "completionLogic.expression must use AND/OR/NOT explicitly and stay readable. Examples: friend:Alice AND money >= 100; item:黑玻苦啤 AND affinity:Raven >= 6; companion:Torin OR companion:Raven; defeated:Darius AND NOT enemy:Alice.",
+    "",
+    "## Objective format (player-side tasks)",
+    "completionLogic.objectives lists each visible task as a separate item. Each objective has: id, kind, target, operator, value, text.",
+    "Use only these objective.kind values: affinity_min, affinity_max, friend, companion, enemy, not_enemy, defeated, item_obtained, item_lost, item_delivered, money_at_least, money_spent, fame_min, fame_max, story_flag.",
+    "objective.target is the NPC name, item name, or flag id. objective.operator is one of >=, <=, =, !=, true, false. objective.value is a string number, true/false, or item/flag id.",
+    "objective.text is the human-readable quest objective in Chinese, written like an in-game task line. It must be a concrete checkable RPG state.",
+    "",
+    "## Strict rule: tasks must be machine-checkable",
+    "Every objective MUST be an unambiguous RPG state check that the engine can evaluate against numbers, inventory, NPC relations, or binary flags. Avoid any objective whose success or failure depends on subjective judgment.",
+    "FORBIDDEN vague objective texts (do NOT generate these): 理解 Alice 的处境, 感受到 Borin 的压力, 与村民建立信任, 完成调查, 揭开真相, 体会 Raven 的牺牲, 让玩家有所成长, 思考是否值得.",
+    "REQUIRED concrete objective patterns (use these forms):",
+    "  - 筹集金钱: kind=money_at_least, target=player, operator='>=', value 是具体数字, text='筹集 N 金币'",
+    "  - 获得道具: kind=item_obtained, target 是具体道具名, operator='=', value='true', text='获得 <道具名>'",
+    "  - 交付道具: kind=item_delivered, target='<道具名>->NPC名', operator='=', value='true', text='把 <道具名> 交给 <NPC>'",
+    "  - 说服成为朋友: kind=friend, target=NPC, operator='=', value='true', text='说服 <NPC> 成为朋友'",
+    "  - 说服成为伙伴: kind=companion, target=NPC, operator='=', value='true', text='说服 <NPC> 成为伙伴'",
+    "  - 提升好感度: kind=affinity_min, target=NPC, operator='>=', value 是具体数字, text='<NPC> 好感度达到 N'",
+    "  - 击败某人: kind=defeated, target=NPC, operator='=', value='true', text='击败 <NPC>'",
+    "  - 避免敌对: kind=not_enemy, target=NPC, operator='=', value='true', text='避免让 <NPC> 把玩家视为敌人'",
+    "  - 提升名誉: kind=fame_min, target=player, operator='>=', value 是具体数字, text='名誉达到 N'",
+    "  - 花费金钱: kind=money_spent, target=player, operator='>=', value 是具体数字, text='付出 N 金币'",
+    "story_flag is allowed ONLY for binary outcomes that cannot be expressed by the kinds above and are externally verifiable, e.g. 'Borin 已签下证词'、'已护送 Eli 到神殿'、'村长已公开支持玩家'. Never use story_flag for emotional or relational states (use friend/affinity instead) or for vague progress markers.",
+    "Every objective.text must reference at least one of: a specific number (金币、好感、名誉数值), a specific named NPC, a specific named item, or a specific binary flag. If you cannot point to one of these, the objective is too vague — rewrite it.",
+    "Concrete kind/target/operator/value/text examples:",
+    "  - { kind: 'friend', target: 'Alice', operator: '=', value: 'true', text: '说服 Alice 成为朋友' }",
+    "  - { kind: 'companion', target: 'Torin', operator: '=', value: 'true', text: '说服 Torin 成为伙伴' }",
+    "  - { kind: 'affinity_min', target: 'Raven', operator: '>=', value: '6', text: 'Raven 好感度达到 6' }",
+    "  - { kind: 'money_at_least', target: 'player', operator: '>=', value: '100', text: '筹集 100 金币' }",
+    "  - { kind: 'money_spent', target: 'player', operator: '>=', value: '50', text: '付给 Borin 50 金币' }",
+    "  - { kind: 'item_obtained', target: '黑玻苦啤', operator: '=', value: 'true', text: '获得 黑玻苦啤' }",
+    "  - { kind: 'item_delivered', target: '黑玻苦啤->Alice', operator: '=', value: 'true', text: '把 黑玻苦啤 交给 Alice' }",
+    "  - { kind: 'defeated', target: 'Darius', operator: '=', value: 'true', text: '击败 Darius' }",
+    "  - { kind: 'not_enemy', target: 'Darius', operator: '=', value: 'true', text: '避免让 Darius 把玩家视为敌人' }",
+    "  - { kind: 'fame_min', target: 'player', operator: '>=', value: '4', text: '名誉达到 4' }",
+    "  - { kind: 'story_flag', target: 'Borin 已签下证词', operator: '=', value: 'true', text: '让 Borin 当众签下证词' }",
+    "",
+    "## Result format (world-state changes)",
+    "Completion results are world-state changes, not decorative notes. Later nodes must respect them in startState, plot, nodeOutcome, edge transitions, and future completionLogic.",
+    "Use only these result.kind values: affinity, friend, enemy, companion, defeated, money, item, fame, route, story_flag.",
+    "Each result has: kind, target, change, delta, text.",
+    "  - change is the canonical state change in short tokens. Allowed forms: '+N' / '-N' for numbers, 'set true' / 'set false' for boolean states, 'gain' / 'lose' for items, 'open' / 'close' for routes.",
+    "  - delta is a short signed string used purely for UI rendering: e.g. '+2', '-3', '+100', '-50', '获得', '失去', '开启', '关闭', '成立', '解除'. It must agree with change.",
+    "  - text is the human-readable consequence in Chinese, e.g. 'Alice 好感度 +2，把玩家当作可信的朋友', 'Darius 把玩家视为敌人，好感度变为 0', '玩家失去 100 金币，因为这笔钱交给 Alice'.",
+    "Concrete result examples:",
+    "  - { kind: 'affinity', target: 'Alice', change: '+2', delta: '+2', text: 'Alice 好感度 +2' }",
+    "  - { kind: 'friend', target: 'Alice', change: 'set true', delta: '成立', text: 'Alice 成为玩家的朋友' }",
+    "  - { kind: 'enemy', target: 'Darius', change: 'set true', delta: '成立', text: 'Darius 把玩家视为敌人' }",
+    "  - { kind: 'companion', target: 'Torin', change: 'set true', delta: '成立', text: 'Torin 加入玩家成为伙伴' }",
+    "  - { kind: 'defeated', target: 'Darius', change: 'set true', delta: '击败', text: '玩家击败 Darius，他被赶出酒馆，无法再阻挠' }",
+    "  - { kind: 'money', target: 'player', change: '-100', delta: '-100', text: '玩家失去 100 金币，交给 Alice' }",
+    "  - { kind: 'item', target: '黑玻苦啤', change: 'gain', delta: '获得', text: '玩家获得 黑玻苦啤' }",
+    "  - { kind: 'item', target: '银扣短刀', change: 'lose', delta: '失去', text: '玩家把 银扣短刀 交给 Borin' }",
+    "  - { kind: 'fame', target: 'player', change: '+1', delta: '+1', text: '名誉 +1，村里的人开始信任玩家' }",
+    "  - { kind: 'route', target: 'Alice 同伴线', change: 'close', delta: '关闭', text: '关闭 Alice 同伴线' }",
+    "",
+    "## Shared vs branch-specific results",
+    "completionLogic.results is only for results shared by every completion path. If different branches have different outcomes, put those outcomes in completionLogic.resultBranches instead of merging them.",
+    "completionLogic.resultBranches must describe branch-specific results when the node has multiple outgoing edges, OR objectives, mutually exclusive choices, or different factions/NPCs to support. Each branch must name which condition it applies to, which target nodes it can lead to, and the results for that branch.",
+    "Branch-specific results should be meaningfully different. Example: branch 帮助 Alice → { Alice affinity +2, friend:Alice set true, Darius enemy set true }; branch 帮助 Darius → { Darius affinity +2, money +50, Alice affinity -3, route Alice 同伴线 close }.",
+    "If money is collected for someone, include the cost result. Example: objective 筹集 100 金币; result kind='money', change='-100', delta='-100', text='玩家失去 100 金币，交给 Alice'.",
+    "Support mutual exclusion when appropriate. Example: if becoming friends with Alice makes Darius hostile, add result kind='enemy', target='Darius', change='set true', delta='成立', text='Darius 把玩家视为敌人'.",
+    "When the structure branches, each branch should have distinct completion results. Do not write later nodes as if all branches produced the same state. If incoming paths have different results, either write the target node's startState to acknowledge both possible states, or use separate target nodes when the selected structure allows it.",
+    "",
+    "## Edges",
+    "Edge transitions must mention the relevant result that carries forward. Example: 因为 Alice 已成为伙伴，Darius 开始针对玩家; or 因为玩家收下 Darius 的钱，Alice 不再主动提供帮助.",
+    "Each edge must include carriedResults: a short list of world-state results from the source node that matter to the target node. These should match the source node completionLogic.results when possible.",
+    "Every edge transition should be 1 to 2 clear sentences. It must mention what changed in the source node and why the target node becomes available. Avoid vague transitions like 然后进入下一节点.",
+    "",
+    "Return only JSON."
+  ].join("\n");
 }
 
 async function handleValidateKey(req, res) {
@@ -462,10 +709,17 @@ async function handleGenerateStory(req, res) {
     return;
   }
 
+  const models = {
+    structure: body.models?.structure || "gpt-4o",
+    foundation: body.models?.foundation || "gpt-5.5",
+    blueprint: body.models?.blueprint || "gpt-4o",
+    detail: body.models?.detail || body.model || "gpt-5.5"
+  };
+
   const [structures, levelData] = await Promise.all([readStructures(), readLevelData()]);
 
   const selectionResponse = await callOpenAI(apiKey, {
-    model: "gpt-4o",
+    model: models.structure,
     input: [
       {
         role: "system",
@@ -522,76 +776,16 @@ async function handleGenerateStory(req, res) {
   const selection = tryParseJson(extractText(selectionResponse));
   const selectedStructure = structures.find(item => item.id === selection.selectedStructureId) || structures[0];
 
-  const generationResponse = await callOpenAI(apiKey, {
-    model: body.model || "gpt-5.5",
+  const foundationResponse = await callOpenAI(apiKey, {
+    model: models.foundation,
     input: [
       {
         role: "system",
         content: [
-          "You are a senior game narrative designer for a node-based story system.",
-          "Write in Simplified Chinese.",
-          "Use only NPCs, items, and locations from the provided Level_AI data.",
-          "If the user gives a famous story, myth, historical scene, or literary plot, do not mechanically reskin its surface. First extract its durable dramatic theme, then adapt that theme into a new story using the available NPCs, items, and location.",
-          "For example, 桃园结义 should become a story about three like-minded people choosing sworn fellowship and a shared adventure under pressure. It should not require Liu Bei, Guan Yu, Zhang Fei, a literal peach garden, or the exact original events.",
-          "The adaptation must preserve the emotional engine: why these people need each other, what risk makes the vow meaningful, what future adventure the vow opens, and what playable actions prove the bond.",
-          "Put this adaptation logic into the adaptation field before writing the story.",
-          "Before writing nodes, define storyContext: playerRole, mainConflict, priorIncident, and stakes. These are the facts the player must understand to role-play well.",
-          "Use a Fabula-like and tabletop DND-like card deal before writing: premise card, conflict card, location card, NPC face cards, item clue/cost cards, twist card, cost card, and resolution card. Put the final deal into designDeck.",
-          "Treat the selected structure as layers. Nodes in the same layer are peer narrative options, not main/sub branches. They must have comparable length, stakes, usefulness, and dramatic weight.",
-          "Do not let same-layer nodes repeat the same scene with renamed NPCs. Each peer node should express a different method, risk, moral angle, or information route.",
-          "Keep the story straightforward. Use one main conflict, one main opposition force, and one clear goal. Branches should be different ways to solve the same main problem, not new subplots.",
-          "For RPG readability, make the player's current objective obvious at every point. A player should understand who is in trouble, who blocks the goal, and what the next available choices are.",
-          "Limit the core cast to 3 to 5 important NPCs across the story unless the selected structure truly requires more. Other NPCs may be omitted.",
-          "Limit the core props to 3 to 5 important items across the story. Do not mention many items just because they exist in Level_AI data.",
-          "Each node should usually contain no more than 3 named NPCs and 2 important items. If more appear, they must have a direct role in that node.",
-          "Avoid nested choices inside a branch. A branch may have steps, but it should not split into another mini-branch unless the selected structure explicitly requires it.",
-          "Avoid stacking several condition words in one paragraph, such as 若选择..., 若选择..., 若已有..., 若已有.... Put choices into separate labeled branch sections.",
-          "Avoid unnecessary twists, fake clues, hidden debts, extra witnesses, or bait plans when a simpler cause-and-effect path works.",
-          "Write like a clear playable scene outline, not like ornate fiction. Use plain words, short sentences, and concrete actions: what happens, who speaks, who walks toward whom, who moves an object, and what changes in the room.",
-          "The plot can be rich without becoming complicated. Include NPC dialogue, NPC movement, small conflicts, reactions, and visible use of items or locations, but keep cause and effect easy to follow.",
-          "The player must be present as an active possible driver of the scene. Include what the player can agree with, question, help with, refuse, give, reveal, protect, or persuade.",
-          "Do not erase the player from expandedStory or node plots. Use optional wording such as 玩家可以..., 若玩家..., 玩家能通过..., 可由玩家选择..., instead of writing that the player already did the action.",
-          "Do not output separate playerOptions or contextFacts fields. Player-facing actions belong in completionCondition, completionLogic, edge labels, and transitions.",
-          "Facts the player needs to understand must be delivered inside the story text, especially through NPC dialogue. When a conflict depends on backstory, make an NPC state the cause in plain language.",
-          "Examples of useful explanatory dialogue: '他三天前收了我的钱却卖了我', '这瓶酒不是吧台的，是他从袖子里拿出来的', '我不敢作证，因为上次作证的人失踪了'.",
-          "Every important dialogue line should include or be surrounded by enough context to explain who is being accused, what happened before, and why the line matters.",
-          "expandedStory must be a coherent story treatment that can later be split into nodes. Do not write meta commentary such as 这是一个从...抽取主题后的故事, 故事通过...结构展开, or 枢纽结构.",
-          "expandedStory should read like one complete story foundation, not like an explicit branch list. Do not use labels such as 分支A, 分支B, HUB, N1, N2, or 条件路线 in expandedStory.",
-          "While writing expandedStory, silently consider the selected structure and leave clear story moments that can become branches later: different NPC motives, competing solutions, important decisions, reversals, and convergence points.",
-          "In expandedStory, focus on NPC speech, movement, player-facing interventions, conflict, and visible changes. Let possible alternatives exist inside the situation, but do not turn it into a menu list.",
-          "expandedStory must make the player role understandable early. Explain why the player is present, why NPCs would listen to the player, and what the player can affect.",
-          "expandedStory should explain important backstory through direct NPC lines or immediate evidence before it asks the player to judge the situation.",
-          "expandedStory should be detailed and useful as the foundation for later node writing. Include enough events, NPC reactions, short dialogue, item usage, and state changes to support the later node structure.",
-          "For expandedStory, write 700 to 1200 Chinese characters when the structure has many nodes. Keep paragraphs readable and cause-effect clear.",
-          "Do not flatten the story into a simple linear quest. Include enough tension and decision points for later branching, but keep the presentation as a smooth story treatment.",
-          "Do not narrate optional player behavior as already completed in expandedStory, plot, startState, or nodeOutcome. Avoid sentences like 玩家已经..., 玩家先做了..., 玩家发现了... unless the player action is written as an option, condition, or available intervention.",
-          "NPCs may act without the player: for example Raven says a warning, Torin blocks the door, Alice walks to the fire, Borin hides coins, or Darius sends a threat.",
-          "Player agency belongs in completionCondition, completionLogic, edge label, and transition. Use wording like 若玩家说服..., 如果获得..., 选择...后可进入..., rather than assuming the action happened.",
-          "Make transitions clear: every edge label is a short playable trigger, and every edge transition explains the state change that unlocks the next node without forcing a single player route.",
-          "Each node must include layer, nodePurpose, startState, plot, nodeOutcome, NPCs, items, locations, completionCondition, completionLogic, and next.",
-          "Node completion is usually a direct task objective. Use completionLogic.type='task_objective' for these gates.",
-          "Completion conditions should be intuitive task goals: become friends with an NPC, reach an affinity value, become companions with an NPC, collect money, spend money, obtain an item from the provided item list, gain evidence, or set a story/location state.",
-          "Use AND/OR/NOT explicitly in completionLogic.expression, but keep it readable. Examples: friend:Alice AND money >= 100; item:黑玻苦啤 AND affinity:Raven >= 6; companion:Torin OR companion:Raven; NOT enemy:Alice.",
-          "completionLogic.objectives should list each visible task objective. Each objective.text should read like a simple quest objective, such as 和 Alice 成为朋友, 筹集 100 金币, 获得 黑玻苦啤, 与 Torin 成为伙伴.",
-          "Use objective kind values like affinity, friend, companion, money_collect, money_spend, item, evidence, location_state, story_flag, not_enemy.",
-          "completionLogic.results should list what happens after completion. Results can modify fame, money, affinity, companion status, friendship, enemy status, item ownership, or story flags.",
-          "If money is collected for someone, include the cost result. Example: objective 筹集 100 金币; result 金钱 -100，因为这笔钱交给 Alice.",
-          "Support mutual exclusion when appropriate. Example: if becoming friends with Alice makes Darius hostile, add result kind='enemy', target='Darius', change='set true', text='Darius 把玩家视为敌人，好感度变为 0'.",
-          "Completion results are world-state changes, not decorative notes. Later nodes must respect them in startState, plot, nodeOutcome, edge transitions, and future completionLogic.",
-          "When the structure branches, each branch should have distinct completion results. For example, helping Alice may increase Alice affinity and make Darius hostile; helping Darius may increase Darius affinity, reduce Alice affinity, and close Alice-companion routes.",
-          "Do not write later nodes as if all branches produced the same state. If incoming paths have different results, either write the target node's startState to acknowledge both possible states, or use separate target nodes when the selected structure allows it.",
-          "Edge transitions must mention the relevant result that carries forward. Example: 因为 Alice 已成为伙伴，Darius 开始针对玩家; or 因为玩家收下 Darius 的钱，Alice 不再主动提供帮助.",
-          "Each edge must include carriedResults: a short list of world-state results from the source node that matter to the target node. These should match the source node completionLogic.results when possible.",
-          "completionCondition is the readable Chinese summary of completionLogic. It should look like a direct task goal plus result summary, not a technical formula.",
-          "startState means the world and NPC situation when this node becomes available. It is not a dramatic hook and must not prescribe player behavior. For non-start nodes, it must clearly connect to at least one incoming edge transition.",
-          "plot means the node's objective situation, NPC actions, background facts, and possible player interventions. It should be 5 to 8 plain sentences. Include at least two concrete NPC actions, one short direct speech line that explains cause or motive when NPCs are present, and one visible use or mention of a relevant item/location.",
-          "Each node plot should feel like a complete small scene: beginning situation, NPC conflict or pressure, important action, choice pressure, and the state that points toward the completion condition.",
-          "nodeOutcome means what has changed when the node condition is satisfied, written as a state change rather than a guaranteed player action. It should be 2 to 3 plain sentences and must prepare the next node's startState.",
-          "Dialogue must be clear. When an NPC says something important, the line or the nearby sentence must explain what they are referring to, what happened before, and why it matters. Avoid cryptic lines that only sound dramatic.",
-          "Every edge transition should be 1 to 2 clear sentences. It must mention what changed in the source node and why the target node becomes available. Avoid vague transitions like 然后进入下一节点.",
-          "Maintain continuity across nodes. If an NPC, item, threat, promise, or clue appears in one node and matters later, carry it forward explicitly instead of resetting the scene.",
-          "expandedStory should be detailed enough to support the main path and later branches, but written as a smooth story foundation instead of a branch outline.",
-          "Respect the selected node structure exactly. Return only JSON."
+          narrativeSystemPrompt(),
+          "This stage writes only the complete story foundation and high-level narrative preparation.",
+          "Do not write node details yet. Do not expose explicit branch labels in expandedStory.",
+          "Return only JSON."
         ].join("\n")
       },
       {
@@ -600,6 +794,77 @@ async function handleGenerateStory(req, res) {
           originalStory: storyPrompt,
           selectedByGpt4o: selection,
           selectedStructure,
+          levelData
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "story_foundation",
+        strict: true,
+        schema: storyFoundationSchema()
+      }
+    }
+  });
+
+  const foundation = tryParseJson(extractText(foundationResponse));
+
+  const blueprintResponse = await callOpenAI(apiKey, {
+    model: models.blueprint,
+    input: [
+      {
+        role: "system",
+        content: [
+          "You split a story foundation into a node blueprint for a game narrative system.",
+          "Write in Simplified Chinese.",
+          "Respect the selected node structure exactly.",
+          "Do not write full node prose. Create concise node purposes, state focus, condition ideas, and edge carried results.",
+          "Use only NPCs, items, and locations from the provided Level_AI data.",
+          "Return only JSON."
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          selectedStructure,
+          foundation,
+          levelData
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "node_blueprint",
+        strict: true,
+        schema: nodeBlueprintSchema()
+      }
+    }
+  });
+
+  const blueprint = tryParseJson(extractText(blueprintResponse));
+
+  const generationResponse = await callOpenAI(apiKey, {
+    model: models.detail,
+    input: [
+      {
+        role: "system",
+        content: [
+          narrativeSystemPrompt(),
+          "This final stage writes detailed nodes and edges from the approved story foundation and node blueprint.",
+          "Keep the foundation fields consistent with the story foundation. Respect the blueprint ids, layers, next links, and intended carried results.",
+          "Return the complete final node story JSON."
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          originalStory: storyPrompt,
+          selectedByGpt4o: selection,
+          selectedStructure,
+          foundation,
+          blueprint,
           levelData
         })
       }
@@ -631,6 +896,12 @@ async function handleGenerateStory(req, res) {
       itemCount: levelData.items.length,
       buildingCount: levelData.buildings.length
     },
+    generationStages: [
+      { stage: "structure", label: "结构选择", model: models.structure },
+      { stage: "foundation", label: "故事底稿", model: models.foundation },
+      { stage: "blueprint", label: "节点蓝图", model: models.blueprint },
+      { stage: "detail", label: "节点细写", model: models.detail }
+    ],
     story
   });
 }

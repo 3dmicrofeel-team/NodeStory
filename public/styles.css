@@ -288,6 +288,22 @@ textarea:focus {
   white-space: pre-line;
 }
 
+.stage-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage-list span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4faf7;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
 .summary-block + .summary-grid,
 .summary-grid + .summary-block {
   margin-top: 18px;
@@ -472,11 +488,101 @@ textarea:focus {
   margin-bottom: 4px;
 }
 
+.plot-text {
+  color: var(--ink);
+  line-height: 1.7;
+  margin: 0 0 12px;
+  white-space: pre-line;
+}
+
+.scene-beats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.scene-beats > section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.scene-beats > section > strong {
+  display: block;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.scene-beats ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.scene-beats li {
+  display: grid;
+  gap: 4px;
+}
+
+.scene-beats .speaker,
+.scene-beats .actor {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.scene-beats .line {
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.scene-beats .action {
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.scene-beats .intent {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.key-dialogue {
+  background: #f4faf7;
+  border-color: #cfe5dc !important;
+}
+
+.key-dialogue .line {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 10px;
+  background: #ffffff;
+  border-radius: 0 6px 6px 0;
+}
+
+.key-actions {
+  background: #fff8e7;
+  border-color: #ead7a7 !important;
+}
+
+.key-actions .action {
+  border-left: 3px solid var(--gold);
+  padding: 4px 0 4px 10px;
+  background: #ffffff;
+  border-radius: 0 6px 6px 0;
+}
+
 .completion-logic {
   border-left: 4px solid var(--accent);
   background: #f4faf7;
   border-radius: 7px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   margin: 10px 0;
 }
 
@@ -500,42 +606,190 @@ textarea:focus {
   color: var(--muted);
   font-family: Consolas, "Courier New", monospace;
   font-size: 12px;
+  margin-top: 10px;
 }
 
-.logic-list,
-.logic-effects {
+.objective-list,
+.result-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
 }
 
-.logic-list p,
-.logic-effects p {
+.objective-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
   background: #fff;
-  padding: 8px;
+  padding: 10px 12px;
 }
 
-.logic-list span,
-.logic-effects span {
-  color: var(--accent-dark);
-  display: inline-block;
-  font-weight: 900;
-  margin-right: 8px;
+.objective-body {
+  display: grid;
+  gap: 4px;
 }
 
-.logic-list em {
+.objective-text {
+  color: var(--ink);
+  font-weight: 700;
+  margin: 0;
+}
+
+.objective-detail {
   color: var(--muted);
-  display: block;
-  font-style: normal;
-  margin-top: 4px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  margin: 0;
 }
 
-.logic-effects > strong {
+.result-block,
+.result-branches {
+  margin-top: 12px;
+}
+
+.result-block > strong,
+.result-branches > strong {
   color: var(--accent-dark);
   font-size: 12px;
   margin: 4px 0 0;
+}
+
+.result-item {
+  display: grid;
+  grid-template-columns: 76px auto auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px 12px;
+}
+
+.result-target {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.result-delta {
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1ede3;
+  color: var(--ink);
+}
+
+.result-text {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.result-item.tone-positive .result-delta {
+  background: #e2f3ec;
+  color: #146050;
+}
+
+.result-item.tone-negative .result-delta {
+  background: #fbe4df;
+  color: #9b342a;
+}
+
+.result-item.tone-neutral .result-delta {
+  background: #f1ede3;
+  color: var(--ink);
+}
+
+.kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 999px;
+  background: #ece5d8;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.kind-affinity .kind-badge,
+.kind-friend .kind-badge,
+.kind-companion .kind-badge,
+.kind-relation .kind-badge {
+  background: #e2f3ec;
+  color: #146050;
+}
+
+.kind-money .kind-badge {
+  background: #fff1d2;
+  color: #8a5a14;
+}
+
+.kind-fame .kind-badge {
+  background: #ece1f4;
+  color: #5e3c91;
+}
+
+.kind-item .kind-badge {
+  background: #e1ecf6;
+  color: #1f4f7c;
+}
+
+.kind-enemy .kind-badge,
+.kind-negative .kind-badge,
+.kind-defeated .kind-badge {
+  background: #fbe4df;
+  color: #9b342a;
+}
+
+.kind-not-enemy .kind-badge {
+  background: #fbf0d8;
+  color: #8a5a14;
+}
+
+.kind-route .kind-badge {
+  background: #ede7d6;
+  color: #4f4a40;
+}
+
+.kind-flag .kind-badge,
+.kind-default .kind-badge {
+  background: #ece5d8;
+  color: var(--ink);
+}
+
+.result-branch {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fffaf1;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.result-branch h4 {
+  color: var(--ink);
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.result-branch .result-list {
+  margin-top: 8px;
+}
+
+.branch-target {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
 }
 
 .tags {
@@ -617,5 +871,22 @@ textarea:focus {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scene-beats {
+    grid-template-columns: 1fr;
+  }
+
+  .objective-item {
+    grid-template-columns: 1fr;
+  }
+
+  .result-item {
+    grid-template-columns: auto auto auto;
+    grid-auto-rows: auto;
+  }
+
+  .result-item .result-text {
+    grid-column: 1 / -1;
   }
 }

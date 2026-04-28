@@ -224,7 +224,7 @@ function renderNodeDetail(nodeId) {
       <div class="transitions">
         <strong>后续衔接</strong>
         ${transitions.length ? transitions.map(edge => `
-          <p><span>${escapeHtml(edge.to)}</span>${escapeHtml(edge.transition || edge.label)}</p>
+          <p><span>${escapeHtml(edge.to)}</span>${escapeHtml(edge.transition || edge.label)}${renderCarriedResults(edge.carriedResults)}</p>
         `).join("") : "<p>这是当前结构的终点节点。</p>"}
       </div>
     </article>
@@ -235,27 +235,34 @@ function renderNodeDetail(nodeId) {
   });
 }
 
+function renderCarriedResults(results) {
+  if (!results || !results.length) return "";
+  return `<em class="carried-results">继承结果：${results.map(escapeHtml).join("；")}</em>`;
+}
+
 function renderCompletionLogic(logic) {
   if (!logic) return "";
-  const rules = logic.rules || [];
-  const effects = logic.effects || [];
+  const objectives = logic.objectives || logic.rules || [];
+  const results = logic.results || logic.effects || [];
 
   return `
     <div class="completion-logic">
-      <strong>完成条件逻辑</strong>
-      <p class="logic-expression">${escapeHtml(logic.expression || logic.description || "-")}</p>
-      ${rules.length ? `
+      <strong>任务目标</strong>
+      <p class="logic-expression">${escapeHtml(logic.summary || logic.description || logic.expression || "-")}</p>
+      ${objectives.length ? `
         <div class="logic-list">
-          ${rules.map(rule => `
-            <p><span>${escapeHtml(rule.id)}</span>${escapeHtml(rule.kind)} · ${escapeHtml(rule.target)} ${escapeHtml(rule.operator)} ${escapeHtml(rule.value)} <em>${escapeHtml(rule.source)}</em></p>
+          ${objectives.map(objective => `
+            <p><span>${escapeHtml(objective.id || objective.kind)}</span>${escapeHtml(objective.text || `${objective.target} ${objective.operator} ${objective.value}`)}</p>
           `).join("")}
         </div>
       ` : ""}
-      ${effects.length ? `
+      ${results.length ? `
         <div class="logic-effects">
-          ${effects.map(effect => `<p><span>${escapeHtml(effect.trigger)}</span>${escapeHtml(effect.effect)}</p>`).join("")}
+          <strong>完成结果</strong>
+          ${results.map(result => `<p><span>${escapeHtml(result.kind || result.trigger)}</span>${escapeHtml(result.text || result.effect || result.change)}</p>`).join("")}
         </div>
       ` : ""}
+      <p class="logic-formula">${escapeHtml(logic.expression || "")}</p>
     </div>
   `;
 }

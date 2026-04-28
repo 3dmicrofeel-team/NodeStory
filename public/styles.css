@@ -496,6 +496,12 @@ textarea:focus {
   font-weight: 700;
 }
 
+.logic-formula {
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
 .logic-list,
 .logic-effects {
   display: grid;
@@ -524,6 +530,12 @@ textarea:focus {
   display: block;
   font-style: normal;
   margin-top: 4px;
+}
+
+.logic-effects > strong {
+  color: var(--accent-dark);
+  font-size: 12px;
+  margin: 4px 0 0;
 }
 
 .tags {
@@ -570,6 +582,14 @@ textarea:focus {
   min-width: 48px;
   color: var(--accent-dark);
   font-weight: 900;
+}
+
+.carried-results {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  margin: 4px 0 0 48px;
 }
 
 .hidden {

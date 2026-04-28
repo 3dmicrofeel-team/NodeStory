@@ -370,36 +370,38 @@ function storySchema() {
             completionLogic: {
               type: "object",
               additionalProperties: false,
-              required: ["type", "description", "expression", "rules", "effects"],
+              required: ["type", "summary", "expression", "objectives", "results"],
               properties: {
                 type: { type: "string" },
-                description: { type: "string" },
+                summary: { type: "string" },
                 expression: { type: "string" },
-                rules: {
+                objectives: {
                   type: "array",
                   items: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["id", "kind", "target", "operator", "value", "source"],
+                    required: ["id", "kind", "target", "operator", "value", "text"],
                     properties: {
                       id: { type: "string" },
                       kind: { type: "string" },
                       target: { type: "string" },
                       operator: { type: "string" },
                       value: { type: "string" },
-                      source: { type: "string" }
+                      text: { type: "string" }
                     }
                   }
                 },
-                effects: {
+                results: {
                   type: "array",
                   items: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["trigger", "effect"],
+                    required: ["kind", "target", "change", "text"],
                     properties: {
-                      trigger: { type: "string" },
-                      effect: { type: "string" }
+                      kind: { type: "string" },
+                      target: { type: "string" },
+                      change: { type: "string" },
+                      text: { type: "string" }
                     }
                   }
                 }
@@ -414,12 +416,13 @@ function storySchema() {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["from", "to", "label", "transition"],
+          required: ["from", "to", "label", "transition", "carriedResults"],
           properties: {
             from: { type: "string" },
             to: { type: "string" },
             label: { type: "string" },
-            transition: { type: "string" }
+            transition: { type: "string" },
+            carriedResults: { type: "array", items: { type: "string" } }
           }
         }
       }
@@ -566,13 +569,20 @@ async function handleGenerateStory(req, res) {
           "Player agency belongs in completionCondition, completionLogic, edge label, and transition. Use wording like 若玩家说服..., 如果获得..., 选择...后可进入..., rather than assuming the action happened.",
           "Make transitions clear: every edge label is a short playable trigger, and every edge transition explains the state change that unlocks the next node without forcing a single player route.",
           "Each node must include layer, nodePurpose, startState, plot, nodeOutcome, NPCs, items, locations, completionCondition, completionLogic, and next.",
-          "Node completion is usually a condition gate. Use completionLogic.type='condition_gate' for these gates.",
-          "Completion conditions can use affinity, companion status, money, item ownership from the provided item list, evidence, location state, or story flags.",
-          "Use AND/OR/NOT explicitly in completionLogic.expression. Examples: (affinity:Alice >= 6 AND item:黑玻苦啤) OR companion:Torin; item:壁卫盾 AND money >= 100; companion:Raven OR companion:Alice; NOT flag:DariusEscaped.",
-          "completionLogic.rules should list each atomic condition. Use kind values like affinity, companion, money, item, evidence, location_state, story_flag. Use operator values like >=, <=, =, has, not_has, true, false.",
-          "completionLogic.effects should list consequences that happen when a condition is satisfied, especially relationship changes or mutually exclusive results.",
-          "Support mutual exclusion when appropriate. Example: if the player becomes friend/companion with Alice, and Alice and Darius are enemies, add an effect such as trigger='companion:Alice' and effect='Darius affinity becomes 0 and Darius treats player as enemy'.",
-          "completionCondition is the readable Chinese summary of completionLogic. It should be understandable to a designer without reading the rules.",
+          "Node completion is usually a direct task objective. Use completionLogic.type='task_objective' for these gates.",
+          "Completion conditions should be intuitive task goals: become friends with an NPC, reach an affinity value, become companions with an NPC, collect money, spend money, obtain an item from the provided item list, gain evidence, or set a story/location state.",
+          "Use AND/OR/NOT explicitly in completionLogic.expression, but keep it readable. Examples: friend:Alice AND money >= 100; item:黑玻苦啤 AND affinity:Raven >= 6; companion:Torin OR companion:Raven; NOT enemy:Alice.",
+          "completionLogic.objectives should list each visible task objective. Each objective.text should read like a simple quest objective, such as 和 Alice 成为朋友, 筹集 100 金币, 获得 黑玻苦啤, 与 Torin 成为伙伴.",
+          "Use objective kind values like affinity, friend, companion, money_collect, money_spend, item, evidence, location_state, story_flag, not_enemy.",
+          "completionLogic.results should list what happens after completion. Results can modify fame, money, affinity, companion status, friendship, enemy status, item ownership, or story flags.",
+          "If money is collected for someone, include the cost result. Example: objective 筹集 100 金币; result 金钱 -100，因为这笔钱交给 Alice.",
+          "Support mutual exclusion when appropriate. Example: if becoming friends with Alice makes Darius hostile, add result kind='enemy', target='Darius', change='set true', text='Darius 把玩家视为敌人，好感度变为 0'.",
+          "Completion results are world-state changes, not decorative notes. Later nodes must respect them in startState, plot, nodeOutcome, edge transitions, and future completionLogic.",
+          "When the structure branches, each branch should have distinct completion results. For example, helping Alice may increase Alice affinity and make Darius hostile; helping Darius may increase Darius affinity, reduce Alice affinity, and close Alice-companion routes.",
+          "Do not write later nodes as if all branches produced the same state. If incoming paths have different results, either write the target node's startState to acknowledge both possible states, or use separate target nodes when the selected structure allows it.",
+          "Edge transitions must mention the relevant result that carries forward. Example: 因为 Alice 已成为伙伴，Darius 开始针对玩家; or 因为玩家收下 Darius 的钱，Alice 不再主动提供帮助.",
+          "Each edge must include carriedResults: a short list of world-state results from the source node that matter to the target node. These should match the source node completionLogic.results when possible.",
+          "completionCondition is the readable Chinese summary of completionLogic. It should look like a direct task goal plus result summary, not a technical formula.",
           "startState means the world and NPC situation when this node becomes available. It is not a dramatic hook and must not prescribe player behavior. For non-start nodes, it must clearly connect to at least one incoming edge transition.",
           "plot means the node's objective situation, NPC actions, background facts, and possible player interventions. It should be 5 to 8 plain sentences. Include at least two concrete NPC actions, one short direct speech line that explains cause or motive when NPCs are present, and one visible use or mention of a relevant item/location.",
           "Each node plot should feel like a complete small scene: beginning situation, NPC conflict or pressure, important action, choice pressure, and the state that points toward the completion condition.",

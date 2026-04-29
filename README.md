@@ -67,6 +67,167 @@ F:\ChronicleForge\Doc\Level_AI
 
 程序会从当前项目目录开始，逐级向上查找 `Doc/Level_AI`。如果云端路径不同，也可以设置环境变量 `LEVEL_AI_DIR` 指向素材目录。
 
+## 节点结构类型
+
+系统会从 `NodeStructure` 中读取 5 种结构，并由模型根据故事运动方式选择最合适的一种。
+
+### 结构 1：双线分支交错汇合
+
+适合两条初始路线互相影响，中段出现多种局部变化，最后逐步汇合到共同结果的故事。
+
+```mermaid
+flowchart LR
+  N1["N1"]
+  N2A["N2A"]
+  N2B["N2B"]
+  N3A["N3A"]
+  N3B["N3B"]
+  N3C["N3C"]
+  N4A["N4A"]
+  N4B["N4B"]
+  N5["N5"]
+  N6["N6"]
+
+  N1 --> N2A
+  N1 --> N2B
+  N2A --> N3A
+  N2A --> N3B
+  N2B --> N3B
+  N2B --> N3C
+  N3A --> N4A
+  N3B --> N4A
+  N3B --> N4B
+  N3C --> N4B
+  N4A --> N5
+  N4B --> N5
+  N5 --> N6
+```
+
+### 结构 2：双线交叉推进
+
+适合两个阵营、两种身份、两组线索或两条路线交叉影响的故事。
+
+```mermaid
+flowchart LR
+  N1["N1"]
+  N2A["N2A"]
+  N2B["N2B"]
+  N3A["N3A"]
+  N3B["N3B"]
+  N4A["N4A"]
+  N4B["N4B"]
+  N5["N5"]
+  N6["N6"]
+
+  N1 --> N2A
+  N1 --> N2B
+  N2A --> N3B
+  N2B --> N3A
+  N3A --> N4A
+  N3B --> N4B
+  N4A --> N5
+  N4B --> N5
+  N5 --> N6
+```
+
+### 结构 3：中心 HUB 多路线
+
+适合一个明确中心地点、中心事件或任务枢纽，多个平级路线都从这里出发并回到共同推进线的故事。
+
+```mermaid
+flowchart LR
+  N1["N1"]
+  N2["N2"]
+  HUB["HUB"]
+  N3A["N3A"]
+  N3B["N3B"]
+  N3C["N3C"]
+  N4A["N4A"]
+  N4B["N4B"]
+  N5["N5"]
+  N6["N6"]
+
+  N1 --> N2
+  N2 --> HUB
+  HUB --> N3A
+  HUB --> N3B
+  HUB --> N3C
+  N3A --> N4A
+  N3B --> N4A
+  N3B --> N4B
+  N3C --> N4B
+  N4A --> N5
+  N4B --> N5
+  N5 --> N6
+```
+
+### 结构 4：关键条件分流
+
+适合故事核心在一次关键条件检查，例如证据、关系、资源、阵营态度或道德选择，不同条件导致不同后果。
+
+```mermaid
+flowchart LR
+  N1["N1"]
+  N2A["N2A"]
+  N2B["N2B"]
+  N3["N3 关键节点"]
+  N4A["N4A"]
+  N4B["N4B"]
+  N4C["N4C"]
+  N5["N5"]
+  N6["N6"]
+
+  N1 --> N2A
+  N1 --> N2B
+  N2A --> N3
+  N2B --> N3
+  N3 -- "条件1" --> N4A
+  N3 -- "条件2" --> N4B
+  N3 -- "ELSE" --> N4C
+  N4A --> N5
+  N4B --> N5
+  N4C --> N5
+  N5 --> N6
+```
+
+### 结构 5：多结局分支
+
+适合前中期选择会影响最终走向的故事，例如和解、牺牲、失败、公开胜利或秘密胜利。
+
+```mermaid
+flowchart LR
+  N1["N1"]
+  N2A["N2A"]
+  N2B["N2B"]
+  N3A["N3A"]
+  N3B["N3B"]
+  N3C["N3C"]
+  N4A["N4A"]
+  N4B["N4B"]
+  N5A["N5A"]
+  N5B["N5B"]
+  E1["E1"]
+  E2["E2"]
+  E3["E3"]
+
+  N1 --> N2A
+  N1 --> N2B
+  N2A --> N3A
+  N2A --> N3B
+  N2B --> N3B
+  N2B --> N3C
+  N3A --> N4A
+  N3B --> N4A
+  N3B --> N4B
+  N3C --> N4B
+  N4A --> N5A
+  N4B --> N5B
+  N5A --> E1
+  N5A --> E2
+  N5B --> E2
+  N5B --> E3
+```
+
 ## 输出内容
 
 整体故事包含：

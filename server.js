@@ -677,6 +677,94 @@ function narrativeSystemPrompt() {
   ].join("\n");
 }
 
+function generatedLevelDataSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["npcs", "buildings"],
+    properties: {
+      npcs: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "type", "state", "affinity", "background"],
+          properties: {
+            name: { type: "string" },
+            type: { type: "string" },
+            state: { type: "string" },
+            affinity: { type: "string" },
+            background: { type: "string" }
+          }
+        }
+      },
+      buildings: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "resource", "description"],
+          properties: {
+            name: { type: "string" },
+            resource: { type: "string" },
+            description: { type: "string" }
+          }
+        }
+      }
+    }
+  };
+}
+
+async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
+  const response = await callOpenAI(apiKey, {
+    model,
+    input: [
+      {
+        role: "system",
+        content: [
+          "You generate NPCs and locations for a node-based RPG, fully derived from the user's story prompt.",
+          "Write in Simplified Chinese.",
+          "Output only JSON that satisfies the provided schema.",
+          "Generate 6 to 10 NPCs and 3 to 5 buildings/locations that are coherent with the story.",
+          "NPC fields:",
+          "  - name: short Chinese name that fits the setting (e.g. 老木匠周延、林姑娘、孙德海、铁匠张).",
+          "  - type: a short role tag, examples: 村民、商人、铁匠、酒馆老板、祭司、守卫、领主、佣兵、盗贼、学徒、吟游诗人、医者、贵族、长老、孤儿、流浪者、信使.",
+          "  - state: 1 short Chinese sentence describing the NPC's current situation when the story begins (what they are doing, what they want, what they fear).",
+          "  - affinity: a small integer string from -3 to 5, representing the NPC's initial attitude toward the player. Use '0' for neutral strangers.",
+          "  - background: 1 to 2 short Chinese sentences explaining the NPC's relevant backstory, hooked to the story conflict.",
+          "Building fields:",
+          "  - name: short Chinese place name (e.g. 老榆酒馆、北门码头、雾湾灯塔、神殿地下、镇议事厅).",
+          "  - resource: a short style/material tag, e.g. 石砌酒馆、木屋集市、古旧神殿、铁匠铺、狭窄码头、地下室、林间帐篷.",
+          "  - description: 1 to 2 short Chinese sentences describing the place's atmosphere and what role it plays in the story.",
+          "Cover at least one location per main act of the conflict (where it begins, where it escalates, where it resolves).",
+          "Make NPC names varied: do not give every NPC the same surname, do not repeat archetypes.",
+          "If the user provided items, you may reference item names inside NPC backgrounds or building descriptions, but do not create or rename items.",
+          "Make sure the cast can sustain the kinds of objectives the player will face: 筹集金钱、说服 NPC、获得道具、击败某 NPC、与某 NPC 成为朋友/伙伴。Include at least one antagonist, one helper-friendly NPC, and one ambiguous NPC.",
+          "Return only JSON."
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          task: "Generate NPCs and buildings consistent with this story.",
+          story: storyPrompt,
+          items
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "level_data_generation",
+        strict: true,
+        schema: generatedLevelDataSchema()
+      }
+    }
+  });
+
+  return tryParseJson(extractText(response));
+}
+
 async function handleValidateKey(req, res) {
   const body = JSON.parse(await readRequestBody(req) || "{}");
   const apiKey = normalizeApiKey(body.apiKey);
@@ -716,7 +804,23 @@ async function handleGenerateStory(req, res) {
     detail: body.models?.detail || body.model || "gpt-5.5"
   };
 
-  const [structures, levelData] = await Promise.all([readStructures(), readLevelData()]);
+  const useLocalCharacters = body.useLocalCharacters !== false;
+
+  const [structures, localData] = await Promise.all([readStructures(), readLevelData()]);
+
+  const levelDataPromise = useLocalCharacters
+    ? Promise.resolve({ data: localData, source: "local" })
+    : generateLevelDataWithAI(apiKey, models.foundation, storyPrompt, localData.items)
+      .then(generated => ({
+        data: {
+          relativePath: localData.relativePath,
+          npcs: Array.isArray(generated.npcs) ? generated.npcs : [],
+          items: localData.items,
+          buildings: Array.isArray(generated.buildings) ? generated.buildings : []
+        },
+        source: "ai",
+        model: models.foundation
+      }));
 
   const selectionResponse = await callOpenAI(apiKey, {
     model: models.structure,
@@ -775,6 +879,10 @@ async function handleGenerateStory(req, res) {
 
   const selection = tryParseJson(extractText(selectionResponse));
   const selectedStructure = structures.find(item => item.id === selection.selectedStructureId) || structures[0];
+
+  const levelDataResolved = await levelDataPromise;
+  const levelData = levelDataResolved.data;
+  const levelDataSource = levelDataResolved.source;
 
   const foundationResponse = await callOpenAI(apiKey, {
     model: models.foundation,
@@ -886,6 +994,17 @@ async function handleGenerateStory(req, res) {
     name: story.selectedStructure?.name || selection.structureName || `结构 ${selectedStructure.id}`
   };
 
+  const generationStages = [];
+  if (levelDataSource === "ai") {
+    generationStages.push({ stage: "level", label: "NPC/地点生成", model: models.foundation });
+  }
+  generationStages.push(
+    { stage: "structure", label: "结构选择", model: models.structure },
+    { stage: "foundation", label: "故事底稿", model: models.foundation },
+    { stage: "blueprint", label: "节点蓝图", model: models.blueprint },
+    { stage: "detail", label: "节点细写", model: models.detail }
+  );
+
   sendJson(res, 200, {
     ok: true,
     selection,
@@ -894,14 +1013,16 @@ async function handleGenerateStory(req, res) {
       relativePath: levelData.relativePath,
       npcCount: levelData.npcs.length,
       itemCount: levelData.items.length,
-      buildingCount: levelData.buildings.length
+      buildingCount: levelData.buildings.length,
+      npcSource: levelDataSource,
+      buildingSource: levelDataSource,
+      itemSource: "local"
     },
-    generationStages: [
-      { stage: "structure", label: "结构选择", model: models.structure },
-      { stage: "foundation", label: "故事底稿", model: models.foundation },
-      { stage: "blueprint", label: "节点蓝图", model: models.blueprint },
-      { stage: "detail", label: "节点细写", model: models.detail }
-    ],
+    levelData: levelDataSource === "ai" ? {
+      npcs: levelData.npcs,
+      buildings: levelData.buildings
+    } : null,
+    generationStages,
     story
   });
 }

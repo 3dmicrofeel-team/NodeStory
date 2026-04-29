@@ -5,11 +5,16 @@
 ## 功能
 
 - 在页面输入 OpenAI API key，并通过 `gpt-4o` 验证。
+- 在页面下拉菜单中选择"推理模型"（用于结构选择和节点蓝图）和"写作模型"（用于故事底稿和节点细写），可选 `gpt-4o`、`gpt-4o-mini`、`gpt-4.1`、`gpt-5.1`、`gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`，选择会保存到本地。
 - 读取 `NodeStructure/*.txt` 中的五种节点结构。
 - 自动向上查找 `Doc/Level_AI` 下的素材：
   - `NPC.csv`
   - `Item.csv`
   - `Building.csv`
+- 在"素材来源"勾选框可选择是否载入本地 NPC 和地点：
+  - 勾选（默认）：使用本地 `NPC.csv` 和 `Building.csv`，与 `Item.csv` 一起送入生成。
+  - 取消勾选：写作模型根据故事提示自动生成 6–10 个 NPC 和 3–5 个地点，字段结构与本地 CSV 解析后的数据一致（NPC：name/type/state/affinity/background；地点：name/resource/description）。
+  - 道具始终从本地 `Item.csv` 读取，不会被替换。
 - 使用分阶段生成：`gpt-4o` 选择结构，`gpt-5.5` 写故事底稿，`gpt-4o` 拆节点蓝图，`gpt-5.5` 细写节点与分支结果。
 - 如果输入的是经典故事、历史桥段或文学母题，会先提炼核心精神，再用当前 NPC、道具和地点改编，而不是机械替换表层元素。
 - 结构选择会根据五种结构的适用场景逐一评分，再选择最匹配故事运动方式的结构。

@@ -6,15 +6,27 @@ const state = {
 };
 
 const STORAGE_KEY = "nodestory.openaiApiKey";
+const REASONING_MODEL_KEY = "nodestory.reasoningModel";
+const WRITING_MODEL_KEY = "nodestory.writingModel";
+const USE_LOCAL_CHARACTERS_KEY = "nodestory.useLocalCharacters";
+const DEFAULT_REASONING_MODEL = "gpt-4o";
+const DEFAULT_WRITING_MODEL = "gpt-5.5";
 
 const elements = {
   apiKey: document.querySelector("#apiKey"),
   rememberKey: document.querySelector("#rememberKey"),
   validateBtn: document.querySelector("#validateBtn"),
   keyStatus: document.querySelector("#keyStatus"),
+  reasoningModel: document.querySelector("#reasoningModel"),
+  writingModel: document.querySelector("#writingModel"),
+  useLocalCharacters: document.querySelector("#useLocalCharacters"),
   storyInput: document.querySelector("#storyInput"),
   generateBtn: document.querySelector("#generateBtn"),
+  importBtn: document.querySelector("#importBtn"),
+  importFileInput: document.querySelector("#importFileInput"),
   exportBtn: document.querySelector("#exportBtn"),
+  sendToUEBtn: document.querySelector("#sendToUEBtn"),
+  sendNodesBtn: document.querySelector("#sendNodesBtn"),
   structures: document.querySelector("#structures"),
   npcCount: document.querySelector("#npcCount"),
   itemCount: document.querySelector("#itemCount"),
@@ -91,6 +103,50 @@ function syncSavedApiKey(apiKey) {
   }
 }
 
+function selectOptionIfAvailable(selectElement, value) {
+  if (!selectElement || !value) return false;
+  const found = Array.from(selectElement.options).some(option => option.value === value);
+  if (found) {
+    selectElement.value = value;
+    return true;
+  }
+  return false;
+}
+
+function loadSavedModels() {
+  const savedReasoning = localStorage.getItem(REASONING_MODEL_KEY);
+  const savedWriting = localStorage.getItem(WRITING_MODEL_KEY);
+  if (!selectOptionIfAvailable(elements.reasoningModel, savedReasoning)) {
+    selectOptionIfAvailable(elements.reasoningModel, DEFAULT_REASONING_MODEL);
+  }
+  if (!selectOptionIfAvailable(elements.writingModel, savedWriting)) {
+    selectOptionIfAvailable(elements.writingModel, DEFAULT_WRITING_MODEL);
+  }
+}
+
+function getSelectedModels() {
+  const reasoning = elements.reasoningModel?.value || DEFAULT_REASONING_MODEL;
+  const writing = elements.writingModel?.value || DEFAULT_WRITING_MODEL;
+  return {
+    structure: reasoning,
+    blueprint: reasoning,
+    foundation: writing,
+    detail: writing
+  };
+}
+
+function loadSavedUseLocalCharacters() {
+  const saved = localStorage.getItem(USE_LOCAL_CHARACTERS_KEY);
+  if (saved === null || saved === undefined) return;
+  if (elements.useLocalCharacters) {
+    elements.useLocalCharacters.checked = saved !== "false";
+  }
+}
+
+function getUseLocalCharacters() {
+  return elements.useLocalCharacters ? elements.useLocalCharacters.checked : true;
+}
+
 function setBusy(isBusy, message) {
   elements.validateBtn.disabled = isBusy;
   elements.generateBtn.disabled = isBusy || !state.validated || !elements.storyInput.value.trim();
@@ -98,6 +154,62 @@ function setBusy(isBusy, message) {
     elements.notice.textContent = message;
     elements.notice.classList.remove("hidden");
   }
+}
+
+function renderGeneratedLevelData(payload) {
+  const summary = payload.levelDataSummary || {};
+  if (summary.npcSource !== "ai") return "";
+  const data = payload.levelData;
+  if (!data) return "";
+  const npcs = Array.isArray(data.npcs) ? data.npcs : [];
+  const buildings = Array.isArray(data.buildings) ? data.buildings : [];
+  if (!npcs.length && !buildings.length) return "";
+
+  const npcMarkup = npcs.length ? `
+    <section>
+      <h4>AI 生成的 NPC</h4>
+      <ul class="generated-list">
+        ${npcs.map(npc => `
+          <li>
+            <div class="generated-head">
+              <strong>${escapeHtml(npc.name || "")}</strong>
+              <span class="generated-tag">${escapeHtml(npc.type || "")}</span>
+              ${npc.affinity !== undefined && npc.affinity !== "" ? `<span class="generated-affinity">好感 ${escapeHtml(npc.affinity)}</span>` : ""}
+            </div>
+            ${npc.state ? `<p class="generated-state">${escapeHtml(npc.state)}</p>` : ""}
+            ${npc.background ? `<p class="generated-background">${escapeHtml(npc.background)}</p>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    </section>
+  ` : "";
+
+  const buildingMarkup = buildings.length ? `
+    <section>
+      <h4>AI 生成的地点</h4>
+      <ul class="generated-list">
+        ${buildings.map(building => `
+          <li>
+            <div class="generated-head">
+              <strong>${escapeHtml(building.name || "")}</strong>
+              <span class="generated-tag">${escapeHtml(building.resource || "")}</span>
+            </div>
+            ${building.description ? `<p class="generated-background">${escapeHtml(building.description)}</p>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    </section>
+  ` : "";
+
+  return `
+    <div class="summary-block">
+      <h3>AI 生成的素材（道具仍来自本地）</h3>
+      <div class="generated-data">
+        ${npcMarkup}
+        ${buildingMarkup}
+      </div>
+    </div>
+  `;
 }
 
 function renderSummary(payload) {
@@ -117,8 +229,15 @@ function renderSummary(payload) {
     ["结局牌", deck.resolutionCard]
   ];
 
-  elements.resultTitle.textContent = story.selectedStructure.name || `结构 ${story.selectedStructure.id}`;
-  elements.resultMeta.textContent = `分阶段生成 · ${story.selectedStructure.file} · 素材来自 ${payload.levelDataSummary.relativePath}`;
+  elements.resultTitle.textContent = story.selectedStructure?.name || `结构 ${story.selectedStructure?.id || ""}`;
+  const summary = payload.levelDataSummary || {};
+  const characterSourceLabel = summary.npcSource === "ai"
+    ? "NPC / 地点：AI 生成"
+    : `NPC / 地点：本地 ${summary.relativePath || ""}`.trim();
+  const itemSourceLabel = `道具：本地 ${summary.relativePath || ""}`.trim();
+  elements.resultMeta.textContent = story.selectedStructure
+    ? `分阶段生成 · ${story.selectedStructure.file || ""} · ${characterSourceLabel} · ${itemSourceLabel}`
+    : "导入 JSON";
   elements.storySummary.classList.remove("hidden");
   elements.storySummary.innerHTML = `
     <div class="summary-block">
@@ -145,6 +264,7 @@ function renderSummary(payload) {
         <div><dt>失败代价</dt><dd>${escapeHtml(storyContext.stakes || "-")}</dd></div>
       </dl>
     </div>
+    ${renderGeneratedLevelData(payload)}
     <div class="summary-block">
       <h3>完整故事底稿</h3>
       <div class="story-text">${escapeHtml(story.expandedStory)}</div>
@@ -177,7 +297,7 @@ function renderSummary(payload) {
     </div>
     <div class="summary-block">
       <h3>选择理由</h3>
-      <p>${escapeHtml(story.reason || payload.selection.reason)}</p>
+      <p>${escapeHtml(story.reason || payload.selection?.reason || "")}</p>
       <div class="score-list">
         ${selectionScores.map(item => `
           <article class="${item.id === story.selectedStructure.id ? "active" : ""}">
@@ -620,8 +740,25 @@ elements.rememberKey.addEventListener("change", () => {
   }
 });
 
+elements.reasoningModel?.addEventListener("change", () => {
+  localStorage.setItem(REASONING_MODEL_KEY, elements.reasoningModel.value);
+});
+
+elements.writingModel?.addEventListener("change", () => {
+  localStorage.setItem(WRITING_MODEL_KEY, elements.writingModel.value);
+});
+
+elements.useLocalCharacters?.addEventListener("change", () => {
+  localStorage.setItem(USE_LOCAL_CHARACTERS_KEY, String(elements.useLocalCharacters.checked));
+});
+
 elements.generateBtn.addEventListener("click", async () => {
-  setBusy(true, "正在分阶段生成：结构选择、故事底稿、节点蓝图、节点细写...");
+  const models = getSelectedModels();
+  const useLocalCharacters = getUseLocalCharacters();
+  const characterStage = useLocalCharacters
+    ? "本地素材：使用 NPC.csv / Building.csv"
+    : `AI 生成 NPC / 地点（${models.foundation}）`;
+  setBusy(true, `${characterStage} → 结构选择 / 节点蓝图（${models.structure}）→ 故事底稿 / 节点细写（${models.foundation}）...`);
   const apiKey = elements.apiKey.value.trim();
   elements.apiKey.value = apiKey;
   syncSavedApiKey(apiKey);
@@ -630,12 +767,16 @@ elements.generateBtn.addEventListener("click", async () => {
       method: "POST",
       body: JSON.stringify({
         apiKey,
-        story: elements.storyInput.value.trim()
+        story: elements.storyInput.value.trim(),
+        models,
+        useLocalCharacters
       })
     });
     state.result = payload;
     state.selectedNodeId = null;
     elements.exportBtn.disabled = false;
+    elements.sendToUEBtn.disabled = false;
+    elements.sendNodesBtn.disabled = false;
     elements.notice.classList.add("hidden");
     renderSummary(payload);
     renderGraph(payload.story);
@@ -646,6 +787,52 @@ elements.generateBtn.addEventListener("click", async () => {
   } finally {
     setBusy(false);
   }
+});
+
+elements.importBtn.addEventListener("click", () => {
+  elements.importFileInput.value = "";
+  elements.importFileInput.click();
+});
+
+elements.importFileInput.addEventListener("change", () => {
+  const file = elements.importFileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const json = JSON.parse(e.target.result);
+      // 支持两种格式：直接是 story 对象（含 nodes/edges），或包含 story 字段的 payload
+      let payload;
+      if (json.nodes && json.edges) {
+        // 裸 story 对象，包装成 payload 格式
+        payload = { story: json };
+      } else if (json.story && json.story.nodes && json.story.edges) {
+        payload = json;
+      } else {
+        throw new Error("JSON 格式不正确：缺少 nodes 或 edges 字段");
+      }
+      const nodes = payload.story.nodes;
+      if (!Array.isArray(nodes) || nodes.length === 0) {
+        throw new Error("nodes 数组为空");
+      }
+      state.result = payload;
+      state.selectedNodeId = null;
+      elements.exportBtn.disabled = false;
+      elements.sendToUEBtn.disabled = false;
+      elements.sendNodesBtn.disabled = false;
+      elements.notice.textContent = `已导入 JSON：${nodes.length} 个节点`;
+      elements.notice.classList.remove("hidden");
+      if (payload.story.selectedStructure) {
+        renderSummary(payload);
+      }
+      renderGraph(payload.story);
+      renderNodes(nodes);
+    } catch (err) {
+      elements.notice.textContent = `导入失败：${err.message}`;
+      elements.notice.classList.remove("hidden");
+    }
+  };
+  reader.readAsText(file, "utf-8");
 });
 
 elements.exportBtn.addEventListener("click", () => {
@@ -659,5 +846,170 @@ elements.exportBtn.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
+elements.sendToUEBtn.addEventListener("click", async () => {
+  if (!state.result) return;
+  const apiKey = elements.apiKey.value.trim();
+  if (!apiKey) {
+    elements.notice.textContent = "请先输入并验证 API Key";
+    elements.notice.classList.remove("hidden");
+    return;
+  }
+  const storyText = state.result.story.expandedStory || state.result.story.storyContext || "";
+  if (!storyText) {
+    elements.notice.textContent = "无法获取故事文本，请重新生成";
+    elements.notice.classList.remove("hidden");
+    return;
+  }
+  setBusy(true, "正在调用 LUA-Skills 生成 Lua 并发送到 UE5...");
+  elements.notice.classList.add("hidden");
+  try {
+    const genResp = await fetch("http://localhost:9000/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ story_input: storyText, api_key: apiKey, stages_only: true })
+    });
+    if (!genResp.ok) {
+      const err = await genResp.text();
+      throw new Error(`LUA-Skills 生成失败 (${genResp.status}): ${err}`);
+    }
+    const genData = await genResp.json();
+    const stages = Array.isArray(genData) ? genData : (genData.stages || []);
+    if (!stages.length) throw new Error("LUA-Skills 返回了空的 stages");
+    let sentCount = 0;
+    for (const stage of stages) {
+      const sendResp = await fetch("http://localhost:9000/api/send-to-unreal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: stage.Type, code: stage.Code })
+      });
+      if (sendResp.ok) sentCount++;
+    }
+    elements.notice.textContent = `已发送 ${sentCount}/${stages.length} 个阶段到 UE5`;
+    elements.notice.classList.remove("hidden");
+  } catch (e) {
+    elements.notice.textContent = `发送失败：${e.message}`;
+    elements.notice.classList.remove("hidden");
+  } finally {
+    setBusy(false);
+  }
+});
+
+elements.sendNodesBtn.addEventListener("click", async () => {
+  if (!state.result) return;
+  const apiKey = elements.apiKey.value.trim();
+  if (!apiKey) {
+    elements.notice.textContent = "请先输入并验证 API Key";
+    elements.notice.classList.remove("hidden");
+    return;
+  }
+  const story = state.result.story;
+  const nodes = story.nodes || [];
+  if (!nodes.length) {
+    elements.notice.textContent = "没有节点数据，请重新生成";
+    elements.notice.classList.remove("hidden");
+    return;
+  }
+
+  setBusy(true, `正在处理 ${nodes.length} 个节点...`);
+  elements.notice.classList.add("hidden");
+
+  try {
+    // 1. 获取 InitMap
+    const mapResp = await fetch("http://localhost:9000/api/preset-map");
+    if (!mapResp.ok) throw new Error("获取 InitMap 失败");
+    const mapData = await mapResp.json();
+    const initMapCode = mapData.code || "";
+
+    // 2. 构建节点的前置flag和结果flag映射
+    const edges = story.edges || [];
+    const nodePrereqs = {};  // nodeId -> [flag]
+    const nodeResults = {};  // nodeId -> [flag]
+    nodes.forEach(n => {
+      nodePrereqs[n.id] = [];
+      nodeResults[n.id] = [];
+      const logic = n.completionLogic;
+      if (logic && logic.resultBranches) {
+        logic.resultBranches.forEach(b => {
+          if (b.appliesWhen) nodeResults[n.id].push(b.appliesWhen);
+        });
+      }
+    });
+    // 从 edges 推导前置条件
+    edges.forEach(e => {
+      if (e.from && e.to) {
+        const fromResults = nodeResults[e.from] || [];
+        if (fromResults.length) {
+          nodePrereqs[e.to] = nodePrereqs[e.to] || [];
+          nodePrereqs[e.to].push(...fromResults);
+        }
+      }
+    });
+
+    // 3. 逐节点调用 /api/generate-node
+    const encounterLuas = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      setBusy(true, `正在生成节点 ${i + 1}/${nodes.length}: ${node.title || node.id}...`);
+      const encPrefix = `enc${String(i + 1).padStart(2, "0")}`;
+      const resp = await fetch("http://localhost:9000/api/generate-node", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          node_id: node.id,
+          node_plot: node.plot || node.nodePurpose || "",
+          node_dialogue: node.keyDialogue || [],
+          node_actions: node.keyActions || [],
+          completion_logic: node.completionLogic || null,
+          prerequisite_flags: nodePrereqs[node.id] || [],
+          result_flags: nodeResults[node.id] || [],
+          enc_prefix: encPrefix,
+          api_key: apiKey
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`节点 ${node.id} 生成失败: ${err}`);
+      }
+      const data = await resp.json();
+      if (data.lua) encounterLuas.push(`-- 节点: ${node.title || node.id}\n${data.lua}`);
+    }
+
+    // 4. 合并所有 Encounter 为一个 InitEvent
+    const initEventCode = [
+      "_G.story_flags = _G.story_flags or {}",
+      "",
+      ...encounterLuas
+    ].join("\n\n");
+
+    // 5. 依次发送 InitMap → InitEvent → StartGame
+    const startGameCode = "World.StartGame()\nTime.Resume()\nUI.Toast(\"游戏开始\")";
+    const stages = [
+      { type: "InitMap", code: initMapCode },
+      { type: "InitEvent", code: initEventCode },
+      { type: "StartGame", code: startGameCode }
+    ];
+
+    let sentCount = 0;
+    for (const stage of stages) {
+      const sendResp = await fetch("http://localhost:9000/api/send-to-unreal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: stage.type, code: stage.code })
+      });
+      if (sendResp.ok) sentCount++;
+    }
+
+    elements.notice.textContent = `多节点发送完成：${nodes.length} 个节点 → ${sentCount}/3 个阶段已发送到 UE5`;
+    elements.notice.classList.remove("hidden");
+  } catch (e) {
+    elements.notice.textContent = `多节点发送失败：${e.message}`;
+    elements.notice.classList.remove("hidden");
+  } finally {
+    setBusy(false);
+  }
+});
+
 loadSavedApiKey();
+loadSavedModels();
+loadSavedUseLocalCharacters();
 loadContext();

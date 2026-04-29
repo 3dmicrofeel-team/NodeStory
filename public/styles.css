@@ -114,7 +114,8 @@ h2 {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -124,15 +125,158 @@ textarea {
   outline: none;
 }
 
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 18px, calc(100% - 13px) 18px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
 textarea {
   resize: vertical;
   line-height: 1.55;
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(31, 111, 100, 0.15);
+}
+
+.model-row,
+.material-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbf7ee;
+  padding: 8px 14px 14px;
+  margin-top: 18px;
+}
+
+.model-row legend,
+.material-row legend {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4f4a40;
+  padding: 0 6px;
+}
+
+.model-row .field,
+.material-row .field {
+  margin-top: 10px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.material-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.material-hint code {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  color: var(--accent-dark);
+}
+
+.generated-data {
+  display: grid;
+  gap: 14px;
+}
+
+.generated-data section h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--accent-dark);
+}
+
+.generated-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.generated-list li {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.generated-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.generated-head strong {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.generated-tag {
+  border: 1px solid #cfe5dc;
+  background: #f4faf7;
+  border-radius: 999px;
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+}
+
+.generated-affinity {
+  border: 1px solid #ead7a7;
+  background: #fff8e7;
+  border-radius: 999px;
+  color: #8a5a14;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+}
+
+.generated-state {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.generated-background {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .key-row {

@@ -32,6 +32,42 @@
           <span id="keyStatus" class="status">未验证</span>
         </div>
 
+        <fieldset class="model-row">
+          <legend>模型选择</legend>
+          <label class="field">
+            <span>推理模型（结构选择 / 节点蓝图）</span>
+            <select id="reasoningModel">
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+              <option value="gpt-5.1">gpt-5.1</option>
+              <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+              <option value="gpt-5.4">gpt-5.4</option>
+              <option value="gpt-5.5">gpt-5.5</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>写作模型（故事底稿 / 节点细写）</span>
+            <select id="writingModel">
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+              <option value="gpt-5.1">gpt-5.1</option>
+              <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+              <option value="gpt-5.4">gpt-5.4</option>
+              <option value="gpt-5.5">gpt-5.5</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset class="material-row">
+          <legend>素材来源</legend>
+          <label class="checkbox-row">
+            <input id="useLocalCharacters" type="checkbox" checked />
+            <span>载入本地 NPC 和地点</span>
+          </label>
+          <p class="material-hint">道具始终从本地 <code>Item.csv</code> 读取。勾选时同时使用本地 <code>NPC.csv</code> 与 <code>Building.csv</code>；取消勾选则由写作模型根据故事生成 NPC 和地点（数据格式与本地一致）。</p>
+        </fieldset>
+
         <label class="field">
           <span>自然语言故事</span>
           <textarea id="storyInput" rows="11" placeholder="例如：三个志同道合的人在酒馆相遇，在危机中结成誓约，并踏上共同冒险。"></textarea>
@@ -66,7 +102,11 @@
             <h2 id="resultTitle">等待生成</h2>
             <p id="resultMeta">验证 Key 后输入故事。</p>
           </div>
+          <button id="importBtn" class="secondary" type="button">导入 JSON</button>
+          <input id="importFileInput" type="file" accept=".json" style="display:none">
           <button id="exportBtn" class="secondary" type="button" disabled>导出 JSON</button>
+          <button id="sendToUEBtn" class="secondary" type="button" disabled>发送到 UE5</button>
+          <button id="sendNodesBtn" class="secondary" type="button" disabled>多节点发送到 UE5</button>
         </div>
 
         <div id="notice" class="notice">生成后先显示节点结构图，点击任意节点查看该节点的剧情、NPC、道具、地点、完成条件和后续衔接。</div>

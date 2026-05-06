@@ -156,35 +156,97 @@ function setBusy(isBusy, message) {
   }
 }
 
-function renderGeneratedLevelData(payload) {
-  const summary = payload.levelDataSummary || {};
-  if (summary.npcSource !== "ai") return "";
-  const data = payload.levelData;
-  if (!data) return "";
-  const npcs = Array.isArray(data.npcs) ? data.npcs : [];
-  const buildings = Array.isArray(data.buildings) ? data.buildings : [];
-  if (!npcs.length && !buildings.length) return "";
+function renderImportantNpcCard(npc) {
+  const examples = Array.isArray(npc.speakingExamples) ? npc.speakingExamples.filter(Boolean) : [];
+  const dossierRows = [
+    ["性格", npc.personality],
+    ["核心动机", npc.coreMotivation],
+    ["情绪弧线", npc.emotionalArc],
+    ["说话风格", npc.speakingStyle]
+  ].filter(([, value]) => value);
 
-  const npcMarkup = npcs.length ? `
+  return `
+    <li class="npc-card npc-important">
+      <div class="generated-head">
+        <span class="npc-importance important-badge">重要角色</span>
+        <strong>${escapeHtml(npc.name || "")}</strong>
+        <span class="generated-tag">${escapeHtml(npc.type || "")}</span>
+        ${npc.mbti ? `<span class="npc-mbti">${escapeHtml(npc.mbti)}</span>` : ""}
+        ${npc.affinity !== undefined && npc.affinity !== "" ? `<span class="generated-affinity">好感 ${escapeHtml(npc.affinity)}</span>` : ""}
+      </div>
+      ${npc.state ? `<p class="generated-state">${escapeHtml(npc.state)}</p>` : ""}
+      ${dossierRows.length ? `
+        <dl class="npc-dossier">
+          ${dossierRows.map(([label, value]) => `
+            <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
+          `).join("")}
+        </dl>
+      ` : ""}
+      ${examples.length ? `
+        <div class="npc-speaking-examples">
+          <strong>说话例句</strong>
+          <ul>
+            ${examples.map(line => `<li>"${escapeHtml(line)}"</li>`).join("")}
+          </ul>
+        </div>
+      ` : ""}
+      ${npc.background ? `<p class="generated-background">${escapeHtml(npc.background)}</p>` : ""}
+    </li>
+  `;
+}
+
+function renderSecondaryNpcCard(npc) {
+  return `
+    <li class="npc-card npc-secondary">
+      <div class="generated-head">
+        <span class="npc-importance secondary-badge">次要角色</span>
+        <strong>${escapeHtml(npc.name || "")}</strong>
+        <span class="generated-tag">${escapeHtml(npc.type || "")}</span>
+        ${npc.affinity !== undefined && npc.affinity !== "" ? `<span class="generated-affinity">好感 ${escapeHtml(npc.affinity)}</span>` : ""}
+      </div>
+      ${npc.personality ? `<p class="generated-state">${escapeHtml(npc.personality)}</p>` : (npc.state ? `<p class="generated-state">${escapeHtml(npc.state)}</p>` : "")}
+      ${npc.background ? `<p class="generated-background">${escapeHtml(npc.background)}</p>` : ""}
+    </li>
+  `;
+}
+
+function renderGeneratedLevelData(payload) {
+  const story = payload.story || {};
+  const cast = Array.isArray(story.cast) ? story.cast : [];
+  const summary = payload.levelDataSummary || {};
+  const data = payload.levelData;
+  const buildings = data && Array.isArray(data.buildings) ? data.buildings : [];
+
+  if (!cast.length && !buildings.length) return "";
+
+  const importantNpcs = cast.filter(npc => (npc.importance || "").toLowerCase() === "important");
+  const secondaryNpcs = cast.filter(npc => (npc.importance || "").toLowerCase() !== "important");
+
+  const sourceTag = story.castSource === "ai"
+    ? "AI 生成"
+    : story.castSource === "local"
+      ? `本地 ${summary.relativePath || ""}`.trim()
+      : "";
+
+  const importantMarkup = importantNpcs.length ? `
     <section>
-      <h4>AI 生成的 NPC</h4>
+      <h4>重要角色 · 共 ${importantNpcs.length} 名</h4>
       <ul class="generated-list">
-        ${npcs.map(npc => `
-          <li>
-            <div class="generated-head">
-              <strong>${escapeHtml(npc.name || "")}</strong>
-              <span class="generated-tag">${escapeHtml(npc.type || "")}</span>
-              ${npc.affinity !== undefined && npc.affinity !== "" ? `<span class="generated-affinity">好感 ${escapeHtml(npc.affinity)}</span>` : ""}
-            </div>
-            ${npc.state ? `<p class="generated-state">${escapeHtml(npc.state)}</p>` : ""}
-            ${npc.background ? `<p class="generated-background">${escapeHtml(npc.background)}</p>` : ""}
-          </li>
-        `).join("")}
+        ${importantNpcs.map(renderImportantNpcCard).join("")}
       </ul>
     </section>
   ` : "";
 
-  const buildingMarkup = buildings.length ? `
+  const secondaryMarkup = secondaryNpcs.length ? `
+    <section>
+      <h4>次要角色 · 共 ${secondaryNpcs.length} 名</h4>
+      <ul class="generated-list">
+        ${secondaryNpcs.map(renderSecondaryNpcCard).join("")}
+      </ul>
+    </section>
+  ` : "";
+
+  const buildingMarkup = (buildings.length && summary.npcSource === "ai") ? `
     <section>
       <h4>AI 生成的地点</h4>
       <ul class="generated-list">
@@ -203,9 +265,10 @@ function renderGeneratedLevelData(payload) {
 
   return `
     <div class="summary-block">
-      <h3>AI 生成的素材（道具仍来自本地）</h3>
+      <h3>故事角色档案${sourceTag ? `<span class="cast-source-tag">${escapeHtml(sourceTag)}</span>` : ""}</h3>
       <div class="generated-data">
-        ${npcMarkup}
+        ${importantMarkup}
+        ${secondaryMarkup}
         ${buildingMarkup}
       </div>
     </div>
@@ -324,6 +387,34 @@ function renderNodes(nodes) {
   `;
 }
 
+function findLocationInfo(name) {
+  if (!name) return null;
+  const story = state.result && state.result.story;
+  const registry = story && Array.isArray(story.locations) ? story.locations : [];
+  return registry.find(loc => loc.name === name) || null;
+}
+
+function renderNodeLocations(node) {
+  const names = (node.locations || []).filter(Boolean);
+  if (!names.length) return "";
+  const cards = names.map(name => {
+    const info = findLocationInfo(name);
+    const resource = info && info.resource ? info.resource : "";
+    const description = info && info.description ? info.description : "";
+    return `
+      <article class="node-location-card">
+        <div class="node-location-head">
+          <span class="node-location-pin">📍</span>
+          <strong>${escapeHtml(name)}</strong>
+          ${resource ? `<span class="node-location-resource">${escapeHtml(resource)}</span>` : ""}
+        </div>
+        ${description ? `<p class="node-location-desc">${escapeHtml(description)}</p>` : ""}
+      </article>
+    `;
+  }).join("");
+  return `<div class="node-location-block">${cards}</div>`;
+}
+
 function renderNodeDetail(nodeId) {
   if (!state.result) return;
   const story = state.result.story;
@@ -333,8 +424,7 @@ function renderNodeDetail(nodeId) {
   state.selectedNodeId = nodeId;
   const tags = [
     ...(node.npcs || []).map(name => `NPC: ${name}`),
-    ...(node.items || []).map(name => `道具: ${name}`),
-    ...(node.locations || []).map(name => `地点: ${name}`)
+    ...(node.items || []).map(name => `道具: ${name}`)
   ];
   const transitions = (story.edges || []).filter(edge => edge.from === node.id);
 
@@ -342,6 +432,7 @@ function renderNodeDetail(nodeId) {
     <article class="node-card selected-detail" id="node-${escapeHtml(node.id)}">
       <div class="node-meta">第 ${escapeHtml(node.layer)} 层 · ${escapeHtml(node.nodePurpose)}</div>
       <h3>${escapeHtml(node.id)} · ${escapeHtml(node.title)}</h3>
+      ${renderNodeLocations(node)}
       <div class="beat"><strong>节点开始状态</strong><p>${escapeHtml(node.startState)}</p></div>
       <div class="plot-text">${escapeHtml(node.plot)}</div>
       ${renderSceneBeats(node)}
@@ -521,6 +612,24 @@ function renderResult(result) {
   `;
 }
 
+const TASK_PATTERN_LABEL = {
+  single_path_gate: "必须通关",
+  success_or_fail_branch: "成败分流",
+  exclusive_choice: "互斥多选"
+};
+const TASK_PATTERN_CLASS = {
+  single_path_gate: "pattern-gate",
+  success_or_fail_branch: "pattern-split",
+  exclusive_choice: "pattern-choice"
+};
+
+function renderTaskPatternBadge(type) {
+  const label = TASK_PATTERN_LABEL[type];
+  if (!label) return "";
+  const cls = TASK_PATTERN_CLASS[type] || "";
+  return `<span class="task-pattern-badge ${cls}" title="${escapeHtml(type)}">${escapeHtml(label)}</span>`;
+}
+
 function renderCompletionLogic(logic) {
   if (!logic) return "";
   const objectives = logic.objectives || logic.rules || [];
@@ -529,7 +638,7 @@ function renderCompletionLogic(logic) {
 
   return `
     <div class="completion-logic">
-      <strong>任务目标</strong>
+      <strong>任务目标 ${renderTaskPatternBadge(logic.type)}</strong>
       <p class="logic-expression">${escapeHtml(logic.summary || logic.description || logic.expression || "-")}</p>
       ${objectives.length ? `
         <ul class="objective-list">
@@ -566,8 +675,8 @@ function renderCompletionLogic(logic) {
 function renderGraph(story) {
   const nodes = story.nodes;
   const edges = story.edges;
-  const nodeWidth = 190;
-  const nodeHeight = 88;
+  const nodeWidth = 200;
+  const nodeHeight = 104;
   const colGap = 96;
   const rowGap = 52;
   const depth = assignDepths(nodes, edges);
@@ -617,12 +726,17 @@ function renderGraph(story) {
     const point = positions.get(node.id);
     if (!point) return "";
     const title = node.title.length > 18 ? `${node.title.slice(0, 17)}...` : node.title;
+    const primaryLocation = (node.locations || []).find(Boolean) || "";
+    const locationLabel = primaryLocation
+      ? (primaryLocation.length > 16 ? `${primaryLocation.slice(0, 15)}...` : primaryLocation)
+      : "";
     return `
-      <g class="graph-node" data-node-id="${escapeHtml(node.id)}" tabindex="0" role="button" aria-label="查看节点 ${escapeHtml(node.id)}">
+      <g class="graph-node" data-node-id="${escapeHtml(node.id)}" tabindex="0" role="button" aria-label="查看节点 ${escapeHtml(node.id)}${primaryLocation ? `，发生在${primaryLocation}` : ""}">
         <rect class="node-rect" x="${point.x}" y="${point.y}" width="${nodeWidth}" height="${nodeHeight}" rx="8" fill="#fffaf1" stroke="#1f6f64" stroke-width="2" />
         <text x="${point.x + 14}" y="${point.y + 25}" font-weight="800">${escapeHtml(node.id)}</text>
         <text x="${point.x + 14}" y="${point.y + 49}">${escapeHtml(title)}</text>
-        <text x="${point.x + 14}" y="${point.y + 72}" class="layer-text">第 ${escapeHtml(node.layer)} 层</text>
+        <text x="${point.x + 14}" y="${point.y + 71}" class="layer-text">第 ${escapeHtml(node.layer)} 层</text>
+        ${locationLabel ? `<text x="${point.x + 14}" y="${point.y + 91}" class="location-text">📍 ${escapeHtml(locationLabel)}</text>` : ""}
       </g>
     `;
   }).join("");
@@ -637,6 +751,7 @@ function renderGraph(story) {
       <style>
         text { font: 13px Inter, Segoe UI, Microsoft YaHei, Arial, sans-serif; fill: #25231e; }
         .layer-text { fill: #6b675d; font-size: 12px; }
+        .location-text { fill: #1f6f64; font-size: 12px; font-weight: 700; }
       </style>
       ${edgeMarkup}
       ${nodeMarkup}
@@ -801,16 +916,28 @@ elements.importFileInput.addEventListener("change", () => {
   reader.onload = (e) => {
     try {
       const json = JSON.parse(e.target.result);
-      // 支持两种格式：直接是 story 对象（含 nodes/edges），或包含 story 字段的 payload
       let payload;
-      if (json.nodes && json.edges) {
-        // 裸 story 对象，包装成 payload 格式
+      let formatLabel = "";
+
+      const looksLeanV1 = json && (json.schemaVersion === "nodestory.lean.v1" || (json.meta && Array.isArray(json.nodes) && !json.edges));
+      const looksRichBare = json && Array.isArray(json.nodes) && Array.isArray(json.edges);
+      const looksRichWrapped = json && json.story && Array.isArray(json.story.nodes) && Array.isArray(json.story.edges);
+
+      if (looksLeanV1) {
+        const story = rehydrateLeanStory(json);
+        if (!story) throw new Error("精简格式 JSON 解析失败");
+        payload = { story };
+        formatLabel = "精简格式 (lean.v1)";
+      } else if (looksRichBare) {
         payload = { story: json };
-      } else if (json.story && json.story.nodes && json.story.edges) {
+        formatLabel = "完整故事对象";
+      } else if (looksRichWrapped) {
         payload = json;
+        formatLabel = "完整 payload";
       } else {
-        throw new Error("JSON 格式不正确：缺少 nodes 或 edges 字段");
+        throw new Error("JSON 格式不正确：未识别到 schemaVersion=nodestory.lean.v1，也缺少 nodes/edges 字段");
       }
+
       const nodes = payload.story.nodes;
       if (!Array.isArray(nodes) || nodes.length === 0) {
         throw new Error("nodes 数组为空");
@@ -820,9 +947,9 @@ elements.importFileInput.addEventListener("change", () => {
       elements.exportBtn.disabled = false;
       elements.sendToUEBtn.disabled = false;
       elements.sendNodesBtn.disabled = false;
-      elements.notice.textContent = `已导入 JSON：${nodes.length} 个节点`;
+      elements.notice.textContent = `已导入 ${formatLabel}：${nodes.length} 个节点`;
       elements.notice.classList.remove("hidden");
-      if (payload.story.selectedStructure) {
+      if (payload.story.selectedStructure && payload.story.selectedStructure.id) {
         renderSummary(payload);
       }
       renderGraph(payload.story);
@@ -835,9 +962,256 @@ elements.importFileInput.addEventListener("change", () => {
   reader.readAsText(file, "utf-8");
 });
 
+function compileStoryExport(story) {
+  if (!story) return null;
+  const structure = story.selectedStructure || {};
+  const ctx = story.storyContext || {};
+  const cast = Array.isArray(story.cast) ? story.cast : [];
+  const locations = Array.isArray(story.locations) ? story.locations : [];
+  const items = Array.isArray(story.items) ? story.items : [];
+  const nodes = Array.isArray(story.nodes) ? story.nodes : [];
+  const edges = Array.isArray(story.edges) ? story.edges : [];
+
+  const appearsByNpc = {};
+  const appearsByItem = {};
+  const appearsByLocation = {};
+  nodes.forEach(node => {
+    (node.npcs || []).forEach(name => {
+      if (!name) return;
+      (appearsByNpc[name] = appearsByNpc[name] || []).push(node.id);
+    });
+    (node.items || []).forEach(name => {
+      if (!name) return;
+      (appearsByItem[name] = appearsByItem[name] || []).push(node.id);
+    });
+    (node.locations || []).forEach(name => {
+      if (!name) return;
+      (appearsByLocation[name] = appearsByLocation[name] || []).push(node.id);
+    });
+  });
+
+  const flagRegistry = new Map();
+  const ensureFlag = id => {
+    if (!flagRegistry.has(id)) {
+      flagRegistry.set(id, { id, description: "", setByNodes: new Set(), checkedByNodes: new Set() });
+    }
+    return flagRegistry.get(id);
+  };
+  nodes.forEach(node => {
+    const logic = node.completionLogic || {};
+    (logic.objectives || []).forEach(obj => {
+      if (obj.kind === "story_flag" && obj.target) {
+        const flag = ensureFlag(obj.target);
+        flag.checkedByNodes.add(node.id);
+        if (!flag.description && obj.text) flag.description = obj.text;
+      }
+    });
+    const collectFlagResult = (results, branchNodeId) => {
+      (results || []).forEach(result => {
+        if (result.kind === "story_flag" && result.target) {
+          const flag = ensureFlag(result.target);
+          flag.setByNodes.add(branchNodeId || node.id);
+          if (!flag.description && result.text) flag.description = result.text;
+        }
+      });
+    };
+    collectFlagResult(logic.results);
+    (logic.resultBranches || []).forEach(branch => collectFlagResult(branch.results, node.id));
+  });
+
+  const compiledNodes = nodes.map(node => {
+    const logic = node.completionLogic || {};
+    const outgoing = edges.filter(edge => edge.from === node.id);
+    const next = outgoing.length
+      ? outgoing.map(edge => ({
+          to: edge.to,
+          label: edge.label || "",
+          transition: edge.transition || "",
+          carriedResults: Array.isArray(edge.carriedResults) ? edge.carriedResults : []
+        }))
+      : (Array.isArray(node.next) ? node.next.map(id => ({ to: id, label: "", transition: "", carriedResults: [] })) : []);
+
+    const locationList = node.locations || [];
+    return {
+      id: node.id,
+      layer: node.layer,
+      title: node.title || "",
+      purpose: node.nodePurpose || "",
+      startState: node.startState || "",
+      location: locationList[0] || "",
+      locations: locationList.length > 1 ? locationList : undefined,
+      npcs: node.npcs || [],
+      items: node.items || [],
+      scene: {
+        narration: node.plot || "",
+        dialogue: (node.keyDialogue || []).map(d => ({
+          speaker: d.speaker || "",
+          line: d.line || "",
+          intent: d.intent || ""
+        })),
+        actions: (node.keyActions || []).map(a => ({
+          actor: a.actor || "",
+          action: a.action || "",
+          intent: a.intent || ""
+        }))
+      },
+      outcome: node.nodeOutcome || "",
+      task: {
+        pattern: TASK_PATTERN_LABEL[logic.type] ? logic.type : "",
+        patternLabel: TASK_PATTERN_LABEL[logic.type] || "",
+        summary: logic.summary || node.completionCondition || "",
+        condition: node.completionCondition || "",
+        expression: logic.expression || "",
+        objectives: logic.objectives || [],
+        results: logic.results || [],
+        branchResults: logic.resultBranches || []
+      },
+      next
+    };
+  });
+
+  return {
+    schemaVersion: "nodestory.lean.v1",
+    meta: {
+      title: structure.name ? `${structure.name}（${structure.id || ""}）` : (structure.id || ""),
+      structure: {
+        id: structure.id || "",
+        name: structure.name || "",
+        file: structure.file || ""
+      },
+      playerRole: ctx.playerRole || "",
+      mainConflict: ctx.mainConflict || "",
+      priorIncident: ctx.priorIncident || "",
+      stakes: ctx.stakes || "",
+      synopsis: story.expandedStory || "",
+      castSource: story.castSource || ""
+    },
+    cast: cast.map(npc => ({
+      name: npc.name,
+      type: npc.type || "",
+      importance: npc.importance || "secondary",
+      mbti: npc.mbti || "",
+      personality: npc.personality || "",
+      speakingStyle: npc.speakingStyle || "",
+      speakingExamples: Array.isArray(npc.speakingExamples) ? npc.speakingExamples : [],
+      emotionalArc: npc.emotionalArc || "",
+      coreMotivation: npc.coreMotivation || "",
+      background: npc.background || "",
+      initialAffinity: npc.affinity ?? "",
+      initialState: npc.state || "",
+      appearsInNodes: appearsByNpc[npc.name] || []
+    })),
+    locations: locations.map(loc => ({
+      name: loc.name,
+      resource: loc.resource || "",
+      description: loc.description || "",
+      appearsInNodes: appearsByLocation[loc.name] || []
+    })),
+    items: items.map(item => ({
+      name: item.name,
+      resource: item.resource || "",
+      description: item.description || "",
+      appearsInNodes: appearsByItem[item.name] || []
+    })),
+    storyFlags: [...flagRegistry.values()].map(flag => ({
+      id: flag.id,
+      description: flag.description,
+      setByNodes: [...flag.setByNodes],
+      checkedByNodes: [...flag.checkedByNodes]
+    })),
+    nodes: compiledNodes
+  };
+}
+
+function rehydrateLeanStory(lean) {
+  if (!lean || !Array.isArray(lean.nodes)) return null;
+  const meta = lean.meta || {};
+  const structure = meta.structure || {};
+  const cast = Array.isArray(lean.cast) ? lean.cast.map(npc => ({
+    name: npc.name,
+    type: npc.type || "",
+    state: npc.initialState || "",
+    affinity: npc.initialAffinity ?? "",
+    background: npc.background || "",
+    importance: npc.importance || "secondary",
+    personality: npc.personality || "",
+    mbti: npc.mbti || "",
+    speakingStyle: npc.speakingStyle || "",
+    speakingExamples: Array.isArray(npc.speakingExamples) ? npc.speakingExamples : [],
+    emotionalArc: npc.emotionalArc || "",
+    coreMotivation: npc.coreMotivation || ""
+  })) : [];
+
+  const nodes = lean.nodes.map(n => {
+    const task = n.task || {};
+    const locations = Array.isArray(n.locations) ? n.locations : (n.location ? [n.location] : []);
+    const scene = n.scene || {};
+    return {
+      id: n.id,
+      layer: n.layer,
+      title: n.title || "",
+      nodePurpose: n.purpose || "",
+      startState: n.startState || "",
+      plot: scene.narration || "",
+      keyDialogue: scene.dialogue || [],
+      keyActions: scene.actions || [],
+      nodeOutcome: n.outcome || "",
+      npcs: n.npcs || [],
+      items: n.items || [],
+      locations,
+      completionCondition: task.condition || task.summary || "",
+      completionLogic: {
+        type: TASK_PATTERN_LABEL[task.pattern] ? task.pattern : "compiled",
+        summary: task.summary || "",
+        expression: task.expression || "",
+        objectives: task.objectives || [],
+        results: task.results || [],
+        resultBranches: task.branchResults || []
+      },
+      next: (n.next || []).map(edge => edge.to)
+    };
+  });
+
+  const edges = [];
+  lean.nodes.forEach(n => {
+    (n.next || []).forEach(edge => {
+      edges.push({
+        from: n.id,
+        to: edge.to,
+        label: edge.label || "",
+        transition: edge.transition || "",
+        carriedResults: edge.carriedResults || []
+      });
+    });
+  });
+
+  return {
+    selectedStructure: { id: structure.id || "", file: structure.file || "", name: structure.name || "" },
+    reason: "",
+    adaptation: { sourceTheme: "", keptSpirit: "", changedSurface: "", newAdventurePromise: "" },
+    storyContext: {
+      playerRole: meta.playerRole || "",
+      mainConflict: meta.mainConflict || "",
+      priorIncident: meta.priorIncident || "",
+      stakes: meta.stakes || ""
+    },
+    designDeck: { premiseCard: "", conflictCard: "", locationCard: "", npcCards: [], itemCards: [], twistCard: "", costCard: "", resolutionCard: "" },
+    expandedStory: meta.synopsis || "",
+    layerNotes: [],
+    nodes,
+    edges,
+    cast,
+    locations: Array.isArray(lean.locations) ? lean.locations : [],
+    items: Array.isArray(lean.items) ? lean.items : [],
+    castSource: meta.castSource || ""
+  };
+}
+
 elements.exportBtn.addEventListener("click", () => {
   if (!state.result) return;
-  const blob = new Blob([JSON.stringify(state.result.story, null, 2)], { type: "application/json" });
+  const compiled = compileStoryExport(state.result.story);
+  if (!compiled) return;
+  const blob = new Blob([JSON.stringify(compiled, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

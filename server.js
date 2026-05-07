@@ -145,7 +145,7 @@ async function readLevelData() {
       background: row.npc_background,
       importance: (row.npc_importance || "").toLowerCase().trim() === "important" ? "important" : (row.npc_importance ? "secondary" : ""),
       personality: row.npc_personality || "",
-      mbti: (row.npc_mbti || "").toUpperCase().trim(),
+      archetype: row.npc_archetype || "",
       speakingStyle: row.npc_speaking_style || "",
       speakingExamples: (row.npc_speaking_examples || "")
         .split("|")
@@ -584,11 +584,11 @@ function narrativeSystemPrompt() {
     "Respect the selected node structure exactly.",
     "",
     "## Character dossier — read before writing any line",
-    "Some NPC entries include a richer profile: importance, personality (with mbti), speakingStyle, speakingExamples, emotionalArc, coreMotivation. When these fields are present and non-empty, treat them as binding constraints, not flavor text. When they are missing or empty (e.g. local NPC data without a profile), fall back to the NPC's state and background.",
+    "Some NPC entries include a richer profile: importance, archetype, personality, speakingStyle, speakingExamples, emotionalArc, coreMotivation. When these fields are present and non-empty, treat them as binding constraints, not flavor text. When they are missing or empty (e.g. local NPC data without a profile), fall back to the NPC's state and background.",
     "If an NPC has importance = 'important' with profile fields, build the main story around that NPC. Every layer should feature at least one important NPC on stage; the main antagonist and the key supporter must each appear in multiple nodes.",
-    "If an NPC has importance = 'secondary', use them for color, small services, atmosphere, or single-fact delivery. Do not let a secondary NPC carry the main conflict, and do not invent MBTI traits or detailed motives for them.",
+    "If an NPC has importance = 'secondary', use them for color, small services, atmosphere, or single-fact delivery. Do not let a secondary NPC carry the main conflict, and do not invent detailed archetype-driven motives for them.",
     "When writing keyDialogue for an important NPC with speakingExamples, the new line must sound like those examples: same rhythm, same vocabulary range, same attitude. Do not give two different important NPCs interchangeable lines.",
-    "When writing keyActions for an important NPC with a personality + coreMotivation, the action must be consistent with both. An ISTP mercenary watches doors and tests blades; an ENFJ priestess steps between people and softens tones; do not flip these.",
+    "When writing keyActions for an important NPC with archetype + personality + coreMotivation, the action must be consistent with all three. 冒险型 tends to take risks and move first; 治愈型 protects, calms, or restores; 学术型 tests evidence and asks precise questions; do not flip these without a story reason.",
     "Across nodes, each important NPC's emotional state must move along their emotionalArc, reacting to what the player and other NPCs do. Do not reset their attitude back to the start state in later nodes once it has shifted.",
     "Each important NPC's coreMotivation must visibly drive at least one keyDialogue or keyAction in any node where they appear. The player should be able to infer what this NPC wants from how they speak and act.",
     "",
@@ -792,7 +792,7 @@ function generatedLevelDataSchema() {
             "background",
             "importance",
             "personality",
-            "mbti",
+            "archetype",
             "speakingStyle",
             "speakingExamples",
             "emotionalArc",
@@ -806,7 +806,7 @@ function generatedLevelDataSchema() {
             background: { type: "string" },
             importance: { type: "string", enum: ["important", "secondary"] },
             personality: { type: "string" },
-            mbti: { type: "string" },
+            archetype: { type: "string", enum: ["冒险型", "艺术型", "实用型", "治愈型", "学术型", "社交型", "神秘型", ""] },
             speakingStyle: { type: "string" },
             speakingExamples: { type: "array", items: { type: "string" } },
             emotionalArc: { type: "string" },
@@ -831,7 +831,19 @@ function generatedLevelDataSchema() {
   };
 }
 
-async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
+function outdoorTestModeInstruction(isEnabled) {
+  if (!isEnabled) return "";
+  return [
+    "## Test mode location rule",
+    "Test mode is ON. Every generated building/location must be an outdoor place.",
+    "Prefer village or small-town outdoor spaces: village square, town gate, outside a tavern, outside a shop, outside a shrine, beside a building, near a well, roadside stall, bridgehead, field edge, forest path, or beside the woods.",
+    "Do not generate indoor places or underground/interior spaces. Forbidden examples: 酒馆内, 客房, 地下室, 神殿内部, 议事厅内, 仓库内, 室内房间.",
+    "The location name, resource tag, and description must all make the outdoor nature obvious."
+  ].join("\n");
+}
+
+async function generateLevelDataWithAI(apiKey, model, storyPrompt, items, options = {}) {
+  const testModeInstruction = outdoorTestModeInstruction(options.testMode === true);
   const response = await callOpenAI(apiKey, {
     model,
     input: [
@@ -858,8 +870,8 @@ async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
           "",
           "## Important character profile (importance = 'important')",
           "Every important NPC MUST fill a complete character dossier:",
-          "  - personality: 1 to 2 Chinese sentences describing the NPC's personality traits, paired with the MBTI type. Mention dominant traits, quirks, and how they typically deal with pressure.",
-          "  - mbti: a 4-letter MBTI type in uppercase (e.g. 'INTJ', 'ESFP', 'ENFJ'). Choose the type that best matches the personality description.",
+          "  - archetype: choose exactly one of 冒险型, 艺术型, 实用型, 治愈型, 学术型, 社交型, 神秘型.",
+          "  - personality: 1 to 2 Chinese sentences describing the NPC's personality traits, paired with the archetype. Mention dominant traits, quirks, and how they typically deal with pressure.",
           "  - speakingStyle: 1 short Chinese sentence describing how this NPC talks — vocabulary, rhythm, tone, attitude (e.g. 短句、直白、爱用反问；客套委婉，回避正面冲突；夹杂行话与脏话).",
           "  - speakingExamples: an array of 3 to 5 short, direct Chinese quotes (under 25 characters each) that this NPC could plausibly say. They must clearly demonstrate the speakingStyle and personality. Avoid generic lines; bake in the NPC's stance, rhythm, and verbal tics.",
           "  - emotionalArc: 1 to 2 Chinese sentences describing how this NPC's emotional state is expected to move across the story (e.g. 起：戒备 → 中：动摇 → 末：托付 / 决裂). Tie it to the player's possible actions.",
@@ -870,7 +882,7 @@ async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
           "Secondary NPCs use a leaner profile. They MUST still satisfy the schema, but the 'important-only' fields stay short or empty:",
           "  - personality: 1 short Chinese phrase describing them in plain words (e.g. 温吞守旧, 爱占便宜的滑头, 沉默寡言的工匠).",
           "  - background: 1 short Chinese sentence with their relevant backstory. Keep it tight; no inner monologue, no long history.",
-          "  - mbti: empty string ''.",
+          "  - archetype: empty string ''.",
           "  - speakingStyle: empty string ''.",
           "  - speakingExamples: empty array [].",
           "  - emotionalArc: empty string ''.",
@@ -881,12 +893,13 @@ async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
           "  - resource: a short style/material tag, e.g. 石砌酒馆、木屋集市、古旧神殿、铁匠铺、狭窄码头、地下室、林间帐篷.",
           "  - description: 1 to 2 short Chinese sentences describing the place's atmosphere and what role it plays in the story.",
           "Cover at least one location per main act of the conflict (where it begins, where it escalates, where it resolves).",
+          testModeInstruction,
           "",
           "## General rules",
           "Make NPC names varied: do not give every NPC the same surname, do not repeat archetypes.",
           "If the user provided items, you may reference item names inside NPC backgrounds or building descriptions, but do not create or rename items.",
           "Make sure the cast can sustain the kinds of objectives the player will face: 筹集金钱、说服 NPC、获得道具、击败某 NPC、与某 NPC 成为朋友/伙伴.",
-          "Important characters' coreMotivation, emotionalArc, and speakingExamples must stay consistent with their personality + mbti and with the story's main conflict.",
+          "Important characters' coreMotivation, emotionalArc, and speakingExamples must stay consistent with their archetype + personality and with the story's main conflict.",
           "Return only JSON."
         ].join("\n")
       },
@@ -895,7 +908,8 @@ async function generateLevelDataWithAI(apiKey, model, storyPrompt, items) {
         content: JSON.stringify({
           task: "Generate NPCs and buildings consistent with this story.",
           story: storyPrompt,
-          items
+          items,
+          testMode: options.testMode === true
         })
       }
     ],
@@ -952,12 +966,14 @@ async function handleGenerateStory(req, res) {
   };
 
   const useLocalCharacters = body.useLocalCharacters !== false;
+  const testMode = body.testMode === true && !useLocalCharacters;
+  const locationModeInstruction = outdoorTestModeInstruction(testMode);
 
   const [structures, localData] = await Promise.all([readStructures(), readLevelData()]);
 
   const levelDataPromise = useLocalCharacters
     ? Promise.resolve({ data: localData, source: "local" })
-    : generateLevelDataWithAI(apiKey, models.foundation, storyPrompt, localData.items)
+    : generateLevelDataWithAI(apiKey, models.foundation, storyPrompt, localData.items, { testMode })
       .then(generated => ({
         data: {
           relativePath: localData.relativePath,
@@ -1040,6 +1056,7 @@ async function handleGenerateStory(req, res) {
           narrativeSystemPrompt(),
           "This stage writes only the complete story foundation and high-level narrative preparation.",
           "Do not write node details yet. Do not expose explicit branch labels in expandedStory.",
+          locationModeInstruction,
           "Return only JSON."
         ].join("\n")
       },
@@ -1049,7 +1066,8 @@ async function handleGenerateStory(req, res) {
           originalStory: storyPrompt,
           selectedByGpt4o: selection,
           selectedStructure,
-          levelData
+          levelData,
+          testMode
         })
       }
     ],
@@ -1076,6 +1094,7 @@ async function handleGenerateStory(req, res) {
           "Respect the selected node structure exactly.",
           "Do not write full node prose. Create concise node purposes, state focus, condition ideas, and edge carried results.",
           "Use only NPCs, items, and locations from the provided Level_AI data.",
+          locationModeInstruction,
           "Return only JSON."
         ].join("\n")
       },
@@ -1084,7 +1103,8 @@ async function handleGenerateStory(req, res) {
         content: JSON.stringify({
           selectedStructure,
           foundation,
-          levelData
+          levelData,
+          testMode
         })
       }
     ],
@@ -1109,6 +1129,7 @@ async function handleGenerateStory(req, res) {
           narrativeSystemPrompt(),
           "This final stage writes detailed nodes and edges from the approved story foundation and node blueprint.",
           "Keep the foundation fields consistent with the story foundation. Respect the blueprint ids, layers, next links, and intended carried results.",
+          locationModeInstruction,
           "Return the complete final node story JSON."
         ].join("\n")
       },
@@ -1120,7 +1141,8 @@ async function handleGenerateStory(req, res) {
           selectedStructure,
           foundation,
           blueprint,
-          levelData
+          levelData,
+          testMode
         })
       }
     ],
@@ -1149,7 +1171,7 @@ async function handleGenerateStory(req, res) {
     background: npc.background || "",
     importance: (npc.importance || "").toLowerCase() === "important" ? "important" : "secondary",
     personality: npc.personality || "",
-    mbti: npc.mbti || "",
+    archetype: npc.archetype || "",
     speakingStyle: npc.speakingStyle || "",
     speakingExamples: Array.isArray(npc.speakingExamples) ? npc.speakingExamples : [],
     emotionalArc: npc.emotionalArc || "",
@@ -1189,7 +1211,8 @@ async function handleGenerateStory(req, res) {
       buildingCount: levelData.buildings.length,
       npcSource: levelDataSource,
       buildingSource: levelDataSource,
-      itemSource: "local"
+      itemSource: "local",
+      testMode
     },
     levelData: levelDataSource === "ai" ? {
       npcs: levelData.npcs,

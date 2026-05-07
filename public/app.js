@@ -9,6 +9,7 @@ const STORAGE_KEY = "nodestory.openaiApiKey";
 const REASONING_MODEL_KEY = "nodestory.reasoningModel";
 const WRITING_MODEL_KEY = "nodestory.writingModel";
 const USE_LOCAL_CHARACTERS_KEY = "nodestory.useLocalCharacters";
+const TEST_MODE_KEY = "nodestory.testMode";
 const DEFAULT_REASONING_MODEL = "gpt-4o";
 const DEFAULT_WRITING_MODEL = "gpt-5.5";
 
@@ -20,6 +21,7 @@ const elements = {
   reasoningModel: document.querySelector("#reasoningModel"),
   writingModel: document.querySelector("#writingModel"),
   useLocalCharacters: document.querySelector("#useLocalCharacters"),
+  testMode: document.querySelector("#testMode"),
   storyInput: document.querySelector("#storyInput"),
   generateBtn: document.querySelector("#generateBtn"),
   importBtn: document.querySelector("#importBtn"),
@@ -147,6 +149,18 @@ function getUseLocalCharacters() {
   return elements.useLocalCharacters ? elements.useLocalCharacters.checked : true;
 }
 
+function loadSavedTestMode() {
+  const saved = localStorage.getItem(TEST_MODE_KEY);
+  if (saved === null || saved === undefined) return;
+  if (elements.testMode) {
+    elements.testMode.checked = saved === "true";
+  }
+}
+
+function getTestMode() {
+  return elements.testMode ? elements.testMode.checked : false;
+}
+
 function setBusy(isBusy, message) {
   elements.validateBtn.disabled = isBusy;
   elements.generateBtn.disabled = isBusy || !state.validated || !elements.storyInput.value.trim();
@@ -171,7 +185,7 @@ function renderImportantNpcCard(npc) {
         <span class="npc-importance important-badge">重要角色</span>
         <strong>${escapeHtml(npc.name || "")}</strong>
         <span class="generated-tag">${escapeHtml(npc.type || "")}</span>
-        ${npc.mbti ? `<span class="npc-mbti">${escapeHtml(npc.mbti)}</span>` : ""}
+        ${npc.archetype ? `<span class="npc-archetype">${escapeHtml(npc.archetype)}</span>` : ""}
         ${npc.affinity !== undefined && npc.affinity !== "" ? `<span class="generated-affinity">好感 ${escapeHtml(npc.affinity)}</span>` : ""}
       </div>
       ${npc.state ? `<p class="generated-state">${escapeHtml(npc.state)}</p>` : ""}
@@ -298,8 +312,9 @@ function renderSummary(payload) {
     ? "NPC / 地点：AI 生成"
     : `NPC / 地点：本地 ${summary.relativePath || ""}`.trim();
   const itemSourceLabel = `道具：本地 ${summary.relativePath || ""}`.trim();
+  const testModeLabel = summary.testMode ? "测试模式：室外地点" : "";
   elements.resultMeta.textContent = story.selectedStructure
-    ? `分阶段生成 · ${story.selectedStructure.file || ""} · ${characterSourceLabel} · ${itemSourceLabel}`
+    ? ["分阶段生成", story.selectedStructure.file || "", characterSourceLabel, itemSourceLabel, testModeLabel].filter(Boolean).join(" · ")
     : "导入 JSON";
   elements.storySummary.classList.remove("hidden");
   elements.storySummary.innerHTML = `
@@ -867,12 +882,17 @@ elements.useLocalCharacters?.addEventListener("change", () => {
   localStorage.setItem(USE_LOCAL_CHARACTERS_KEY, String(elements.useLocalCharacters.checked));
 });
 
+elements.testMode?.addEventListener("change", () => {
+  localStorage.setItem(TEST_MODE_KEY, String(elements.testMode.checked));
+});
+
 elements.generateBtn.addEventListener("click", async () => {
   const models = getSelectedModels();
   const useLocalCharacters = getUseLocalCharacters();
+  const testMode = getTestMode();
   const characterStage = useLocalCharacters
     ? "本地素材：使用 NPC.csv / Building.csv"
-    : `AI 生成 NPC / 地点（${models.foundation}）`;
+    : `AI 生成 NPC / 地点（${models.foundation}${testMode ? "，测试模式室外地点" : ""}）`;
   setBusy(true, `${characterStage} → 结构选择 / 节点蓝图（${models.structure}）→ 故事底稿 / 节点细写（${models.foundation}）...`);
   const apiKey = elements.apiKey.value.trim();
   elements.apiKey.value = apiKey;
@@ -884,7 +904,8 @@ elements.generateBtn.addEventListener("click", async () => {
         apiKey,
         story: elements.storyInput.value.trim(),
         models,
-        useLocalCharacters
+        useLocalCharacters,
+        testMode
       })
     });
     state.result = payload;
@@ -1090,7 +1111,7 @@ function compileStoryExport(story) {
       name: npc.name,
       type: npc.type || "",
       importance: npc.importance || "secondary",
-      mbti: npc.mbti || "",
+      archetype: npc.archetype || "",
       personality: npc.personality || "",
       speakingStyle: npc.speakingStyle || "",
       speakingExamples: Array.isArray(npc.speakingExamples) ? npc.speakingExamples : [],
@@ -1135,7 +1156,7 @@ function rehydrateLeanStory(lean) {
     background: npc.background || "",
     importance: npc.importance || "secondary",
     personality: npc.personality || "",
-    mbti: npc.mbti || "",
+    archetype: npc.archetype || "",
     speakingStyle: npc.speakingStyle || "",
     speakingExamples: Array.isArray(npc.speakingExamples) ? npc.speakingExamples : [],
     emotionalArc: npc.emotionalArc || "",
@@ -1386,4 +1407,5 @@ elements.sendNodesBtn.addEventListener("click", async () => {
 loadSavedApiKey();
 loadSavedModels();
 loadSavedUseLocalCharacters();
+loadSavedTestMode();
 loadContext();

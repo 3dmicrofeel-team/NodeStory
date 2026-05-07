@@ -13,8 +13,10 @@
   - `Building.csv`
 - 在"素材来源"勾选框可选择是否载入本地 NPC 和地点：
   - 勾选（默认）：使用本地 `NPC.csv` 和 `Building.csv`，与 `Item.csv` 一起送入生成。
-  - 取消勾选：写作模型根据故事提示自动生成 6–10 个 NPC 和 3–5 个地点，字段结构与本地 CSV 解析后的数据一致（NPC：name/type/state/affinity/background；地点：name/resource/description）。
+  - 取消勾选：写作模型根据故事提示自动生成 6–10 个 NPC 和 3–5 个地点，字段结构与本地 CSV 解析后的数据一致（NPC：name/type/archetype/state/affinity/background；地点：name/resource/description）。
   - 道具始终从本地 `Item.csv` 读取，不会被替换。
+- 开启测试模式后，如果地点由 AI 生成，地点会限制为村庄、小镇广场、酒馆外、建筑外、树林旁等室外场景，不生成室内地点。
+- NPC 不再使用 MBTI；AI 生成的重要 NPC 会使用 `archetype` 角色类型：冒险型、艺术型、实用型、治愈型、学术型、社交型、神秘型。
 - 使用分阶段生成：`gpt-4o` 选择结构，`gpt-5.5` 写故事底稿，`gpt-4o` 拆节点蓝图，`gpt-5.5` 细写节点与分支结果。
 - 如果输入的是经典故事、历史桥段或文学母题，会先提炼核心精神，再用当前 NPC、道具和地点改编，而不是机械替换表层元素。
 - 结构选择会根据五种结构的适用场景逐一评分，再选择最匹配故事运动方式的结构。

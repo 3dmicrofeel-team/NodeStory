@@ -54,9 +54,19 @@ async function requestJson(url, options = {}) {
       ...(options.headers || {})
     }
   });
-  const data = await response.json();
+  const raw = await response.text();
+  let data = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `服务端返回非 JSON（HTTP ${response.status}）。若为 HTML，请重启 NodeStory 或检查控制台。预览：${raw.slice(0, 120)}`
+      );
+    }
+  }
   if (!response.ok || data.ok === false) {
-    throw new Error(data.error || "请求失败");
+    throw new Error(data.error || `请求失败（HTTP ${response.status}）`);
   }
   return data;
 }
